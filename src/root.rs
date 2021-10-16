@@ -153,6 +153,10 @@ pub fn init(matches: &ArgMatches) -> MyResult<()> {
         return Err("Could not create target directory");
     }
 
+    if let Err(_) = File::create("_toc.md") {
+        return Err("Could not create table of contents");
+    }
+
     if !matches.is_present("nogit") {
         if let Err(_) = Repository::init(".") {
             return Err("Could not initialize github repository in this directory");

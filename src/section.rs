@@ -1,8 +1,8 @@
 use clap::ArgMatches;
 use serde::{Serialize, Deserialize};
 use std::str::{FromStr};
-use std::io::stdin;
-use std::fs::{self, File, remove_dir_all};
+use std::io::{stdin, BufReader, BufRead, Write};
+use std::fs::{self, File, remove_dir_all, OpenOptions};
 use crate::constants::*;
 use crate::root::Root;
 
@@ -45,6 +45,22 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
     root.sections.push(sec);
 
     root.write()?;
+
+    // Add to the toc
+    {
+        let mut file = match OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open(Root::concat_root_dir("_toc.md")?) {
+            Ok(f) => f,
+            Err(_) => return Err("Could not open table of contents")
+        };
+
+        if let Err(e) = file.write_all(&format!("* [{0}]{{0}}\n", name).as_bytes()) {
+            return Err("Could not add section name to toc.");
+        }
+    }
+
 
     let mut section_path = Root::concat_root_dir("text/")?;
     section_path.push_str(name);
@@ -92,10 +108,36 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
     }
 
     // Delete the section
+    let mut root = Root::summon()?;
+
+    {
+        let mut new_toc = String::new();
+        let reader = BufReader::new(match File::open(Root::concat_root_dir("_toc.md")?) {
+            Ok(f) => f,
+            Err(_) => return Err("Could not open the table of contents file")
+        });
+        for line in reader.lines() {
+            let line = match line {
+                Ok(l) => l,
+                Err(_) => continue
+            };
+            if !line.contains(&format!("[{}]", name)) {
+                new_toc.push_str(&line);
+                new_toc.push_str("\n");
+            }
+        }
+        let mut toc = match File::create(Root::concat_root_dir("_toc.md")?) {
+            Ok(f) => f,
+            Err(_) => return Err("Could not open the table of contents")
+        };
+        if let Err(_) = toc.write_all(&new_toc.as_bytes()) {
+            return Err("Could not write to the table of contents file");
+        };
+    }
+
     if let Err(_) = remove_dir_all(format!("text/{}", name)) {
         return Err("Cannot remove the section file");
     };
-    let mut root = Root::summon()?;
     let index = root.sections.iter().position(|x| x.name == name).unwrap();
     root.sections.remove(index);
     root.write()?;
