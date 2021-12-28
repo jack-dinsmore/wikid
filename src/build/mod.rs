@@ -1,14 +1,15 @@
 use crate::constants::*;
 use clap::{ArgMatches};
 use crate::root::Root;
-use std::str::FromStr;
-use std::fs::{remove_dir_all, create_dir};
+use std::fs::{remove_dir_all, create_dir, read_dir, File};
 use crate::build::refs::RefMap;
+use crate::build::compile_tree::CompileTree;
 use crate::build::file_queue::FileQueue;
 
 mod css;
 mod refs;
 mod file_queue;
+mod compile_tree;
 
 use css::build_css;
 
@@ -24,9 +25,17 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
 
     let mut file_queue = FileQueue::new();
 
+    // Make css files
     build_css(&root, &mut file_queue);
+
+    // Load reference handles
     let ref_map = RefMap::new(&root);
-    
+
+    // Compile text
+    let compile_tree = CompileTree::new(&root);
+    compile_tree.compile(&mut file_queue);
+
+
     // Write
     let mut target_existed = true;
     let target_dir = Root::concat_root_dir("target/")?;
