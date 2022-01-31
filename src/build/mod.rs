@@ -33,7 +33,7 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
 
     // Compile text
     let compile_tree = CompileTree::new(&root);
-    compile_tree.compile(&mut file_queue);
+    compile_tree.compile(&mut file_queue, &ref_map)?;
 
 
     // Write
