@@ -2,7 +2,7 @@ use std::str::{FromStr};
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::{self, Visitor, MapAccess};
 
-pub type MyResult<T> = Result<T, &'static str>;
+pub type MyResult<T> = Result<T, String>;
 
 pub const WIKID_VERSION_MAJOR: u32 = 0;
 pub const WIKID_VERSION_MINOR: u32 = 0;

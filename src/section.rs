@@ -26,7 +26,7 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
     let color = loop {
         let mut buffer = String::new();
         if let Err(_) = stdin().read_line(&mut buffer) {
-            return Err("Could not read terminal buffer");
+            return Err("Could not read terminal buffer".to_owned());
         }
         match Color::from_str(buffer.trim_end()) {
             Ok(c) => break c,
@@ -37,7 +37,7 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
     let mut root = Root::summon()?;
     for sec in &root.sections {
         if sec.name == name {
-            return Err("This name has already been taken");
+            return Err("This name has already been taken".to_owned());
         }
     }
 
@@ -53,11 +53,11 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
         .append(true)
         .open(Root::concat_root_dir("_toc.md")?) {
             Ok(f) => f,
-            Err(_) => return Err("Could not open table of contents")
+            Err(_) => return Err("Could not open table of contents".to_owned())
         };
 
         if let Err(e) = file.write_all(&format!("* [{0}]{{0}}\n", name).as_bytes()) {
-            return Err("Could not add section name to toc.");
+            return Err("Could not add section name to toc.".to_owned());
         }
     }
 
@@ -66,12 +66,12 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
     section_path.push_str(name);
 
     if let Err(_) = fs::create_dir(&section_path) {
-        return Err("Could not create section directory.");
+        return Err("Could not create section directory.".to_owned());
     }
 
 
     if let Err(_) = File::create(format!("{}/_toc.md", section_path)) {
-        return Err("Could not create section table of contents.");
+        return Err("Could not create section table of contents.".to_owned());
     }
 
     println!("Created section");
@@ -84,7 +84,7 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
 
     let files = match fs::read_dir(Root::concat_root_dir(&format!("text/{}", name))?) {
         Ok(p) => p,
-        Err(_) => return Err("That section did not exist")
+        Err(_) => return Err("That section did not exist".to_owned())
     };
 
     let forced = matches.is_present("force");
@@ -95,7 +95,7 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
         for file in files {
             let file_name = match file {
                 Ok(f) => f.file_name(),
-                Err(_) => return Err("Could not read all the files in the section directory")
+                Err(_) => return Err("Could not read all the files in the section directory".to_owned())
             };
             if file_name != "_toc.md" {
                 println!("Encountered file {:?} in section {}", file_name, name);
@@ -103,7 +103,7 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
             }
         }
         if directory_is_full {
-            return Err("Cannot delete a full directory without a force")
+            return Err("Cannot delete a full directory without a force".to_owned())
         }
     }
 
@@ -114,7 +114,7 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
         let mut new_toc = String::new();
         let reader = BufReader::new(match File::open(Root::concat_root_dir("_toc.md")?) {
             Ok(f) => f,
-            Err(_) => return Err("Could not open the table of contents file")
+            Err(_) => return Err("Could not open the table of contents file".to_owned())
         });
         for line in reader.lines() {
             let line = match line {
@@ -128,15 +128,15 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
         }
         let mut toc = match File::create(Root::concat_root_dir("_toc.md")?) {
             Ok(f) => f,
-            Err(_) => return Err("Could not open the table of contents")
+            Err(_) => return Err("Could not open the table of contents".to_owned())
         };
         if let Err(_) = toc.write_all(&new_toc.as_bytes()) {
-            return Err("Could not write to the table of contents file");
+            return Err("Could not write to the table of contents file".to_owned());
         };
     }
 
     if let Err(_) = remove_dir_all(format!("text/{}", name)) {
-        return Err("Cannot remove the section file");
+        return Err("Cannot remove the section file".to_owned());
     };
     let index = root.sections.iter().position(|x| x.name == name).unwrap();
     root.sections.remove(index);

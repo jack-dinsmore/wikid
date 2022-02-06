@@ -30,13 +30,13 @@ impl Root {
         }
     }
 
-    fn get_root_dir() -> MyResult<String> {
+    pub fn get_root_dir() -> MyResult<String> {
         // Scan for the wikid file.
         let mut path = Path::new("./");
         loop {
             let paths = match fs::read_dir("./") {
                 Ok(p) => p,
-                Err(_) => return Err("Wikid has not been initialized in this directory.")
+                Err(_) => return Err("Wikid has not been initialized in this directory.".to_owned())
             };
             for test_path in paths {
                 let path = match test_path {
@@ -48,11 +48,11 @@ impl Root {
                         if n == ".wikid" {
                             let parent = match path.parent() {
                                 Some(p) => p,
-                                None => return Err(".wikid had no parent")
+                                None => return Err(".wikid had no parent".to_owned())
                             };
                             return Ok(match parent.to_str(){
                                 Some(s) => s.to_owned(),
-                                None => return Err("Could not resolve .wikid path")
+                                None => return Err("Could not resolve .wikid path".to_owned())
                             });
                         }
                     }
@@ -60,7 +60,7 @@ impl Root {
             }
             path = match path.parent() {
                 Some(p) => p,
-                None => return Err("Wikid has not been initialized in this directory.")
+                None => return Err("Wikid has not been initialized in this directory.".to_owned())
             };
         }
     }
@@ -75,7 +75,7 @@ impl Root {
     pub fn summon() -> MyResult<Root> {
         let paths = match fs::read_dir(Root::concat_root_dir(".wikid")?) {
             Ok(p) => p,
-            Err(_) => return Err("Wikid directory was invalid")
+            Err(_) => return Err("Wikid directory was invalid".to_owned())
         };
 
         for test_path in paths {
@@ -88,30 +88,30 @@ impl Root {
                     if n == "wikid.json" {
                         return Ok(match serde_json::from_str(&match fs::read_to_string(path) {
                             Ok(s) => s,
-                            Err(_) => return Err("Could not open wikid.json")
+                            Err(_) => return Err("Could not open wikid.json".to_owned())
                         }) {
                             Ok(r) => r,
-                            Err(_) => return Err("Wikid.json was corrupted")
+                            Err(_) => return Err("Wikid.json was corrupted".to_owned())
                         });
                     }
                 }
             }
         }
-        Err("Could not find the wikid.json file.")
+        Err("Could not find the wikid.json file.".to_owned())
     }
 
     pub fn write(&self) -> MyResult<()> {
         let json_text = match serde_json::to_string(self) {
-            Err(_) => return Err("Failed to write root data to json"),
+            Err(_) => return Err("Failed to write root data to json".to_owned()),
             Ok(t) => t
         };
 
         let mut file = match File::create(Root::concat_root_dir(".wikid/wikid.json")?) {
             Ok(f) => f,
-            Err(_) => return Err("Could not create wikid.json")
+            Err(_) => return Err("Could not create wikid.json".to_owned())
         };
         if let Err(_) = file.write_all(json_text.as_bytes()) {
-            return Err("Could not write to wikid.json");
+            return Err("Could not write to wikid.json".to_owned());
         }
 
         Ok(())
@@ -120,15 +120,15 @@ impl Root {
     pub fn get_github_url() -> MyResult<String> {
         let repo = match Repository::open(Root::get_root_dir()?) {
             Ok(r) => r,
-            Err(_) => return Err("Could not find repo in this wiki")
+            Err(_) => return Err("Could not find repo in this wiki".to_owned())
         };
         let origin = match repo.find_remote("origin") {
             Ok(o) => o,
-            Err(_) => return Err("Could not find remote named origin")
+            Err(_) => return Err("Could not find remote named origin".to_owned())
         };
         Ok(match origin.url() {
             Some(u) => u,
-            None => return Err("Origin did not have a url")
+            None => return Err("Origin did not have a url".to_owned())
         }.to_string())
     }
 }
@@ -138,28 +138,28 @@ pub fn init(matches: &ArgMatches) -> MyResult<()> {
                                 .expect("name is a required argument")
                                 .to_string();
     if let Err(_) = fs::create_dir(".wikid") {
-        return Err("Could not create .wikid directory");
+        return Err("Could not create .wikid directory".to_owned());
     }
 
     if let Err(_) = fs::create_dir("code") {
-        return Err("Could not create code directory");
+        return Err("Could not create code directory".to_owned());
     }
 
     if let Err(_) = fs::create_dir("text") {
-        return Err("Could not create text directory");
+        return Err("Could not create text directory".to_owned());
     }
 
     if let Err(_) = fs::create_dir("html") {
-        return Err("Could not create target directory");
+        return Err("Could not create target directory".to_owned());
     }
 
     if let Err(_) = File::create("_toc.md") {
-        return Err("Could not create table of contents");
+        return Err("Could not create table of contents".to_owned());
     }
 
     if !matches.is_present("nogit") {
         if let Err(_) = Repository::init(".") {
-            return Err("Could not initialize github repository in this directory");
+            return Err("Could not initialize github repository in this directory".to_owned());
         }
     }
     else {
