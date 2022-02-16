@@ -25,9 +25,9 @@ impl RefMap {
         let url_stem = if public {
             root.public_url.clone()
         } else {
-            format!("file://{}", Root::get_root_dir().expect("No root directory"))
+            format!("file://{}/html", Root::get_root_dir().expect("No root directory"))
         };
-        
+
         RefMap { posts, secs, eqs, projects, vocab, url_stem }
     }
 
@@ -41,11 +41,18 @@ impl RefMap {
         let file_name = Path::new(path).file_name().expect("Incorrectly formatted path");
 
         let mut label = "".to_owned();
-        let mut top_of_file = true;
         let mut eq_num = 0;
         let mut sec_num = [0; 5];
         let mut header_index = 0;
-        let bare_link = self.url_stem.to_owned() + &path[..path.len()-4];// Remove .md
+        let mut bare_link = self.url_stem.to_owned() + &path[1..path.len()-3];// Remove .md
+        if bare_link.ends_with("_toc") {
+            bare_link = format!("{}index", &bare_link[..bare_link.len()-4]);
+        }
+
+        self.posts.insert((&path[2..path.len()-3]).to_owned(), (
+            file_name.to_str().expect("Incorrectly formatted path").to_owned(),
+            format!("{}.html", bare_link)
+        ));
 
         // Write center material
         for (line_num, line) in io::BufReader::new(file).lines().enumerate() {
@@ -57,7 +64,7 @@ impl RefMap {
                     loop {
                         match label.chars().nth(0) {
                             Some(c) => if c != ' ' { break } else { label = label[1..].to_owned() },
-                            None => return Err(format!("Line {}: Label line was empty", line_num))
+                            None => return Err(format!("File {} line {}: Label line was empty", path, line_num+1))
                         }
                     }
                     loop {
@@ -65,13 +72,6 @@ impl RefMap {
                             Some(c) => if c != ' ' { break } else { label = label[..label.len()-2].to_owned() },
                             None => return Err("Label line was empty".to_owned())
                         }
-                    }
-                    if top_of_file {
-                        self.posts.insert(label.to_owned(), (
-                            file_name.to_str().expect("Incorrectly formatted path").to_owned(),
-                            format!("{}.html", bare_link)
-                        ));
-                        top_of_file = false;
                     }
                 }
                 continue;

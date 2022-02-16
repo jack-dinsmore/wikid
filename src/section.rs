@@ -82,7 +82,7 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
 pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
     let name = matches.value_of("delete").expect("DELETE_NAME was required");
 
-    let files = match fs::read_dir(Root::concat_root_dir(&format!("text/{}", name))?) {
+    let files = match fs::read_dir(Root::concat_root_dir(&format!("{}", name))?) {
         Ok(p) => p,
         Err(_) => return Err("That section did not exist".to_owned())
     };
@@ -135,7 +135,7 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
         };
     }
 
-    if let Err(_) = remove_dir_all(format!("text/{}", name)) {
+    if let Err(_) = remove_dir_all(format!("{}", name)) {
         return Err("Cannot remove the section file".to_owned());
     };
     let index = root.sections.iter().position(|x| x.name == name).unwrap();

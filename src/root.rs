@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, env};
 use clap::{ArgMatches};
 use serde::{Serialize, Deserialize};
 use std::fs::File;
@@ -32,35 +32,20 @@ impl Root {
 
     pub fn get_root_dir() -> MyResult<String> {
         // Scan for the wikid file.
-        let mut path = Path::new("./");
+        let mut path = env::current_dir().unwrap();
+        
         loop {
-            let paths = match fs::read_dir("./") {
-                Ok(p) => p,
-                Err(_) => return Err("Wikid has not been initialized in this directory.".to_owned())
-            };
-            for test_path in paths {
-                let path = match test_path {
-                    Ok(p) => p.path(),
-                    Err(_) => continue
-                };
-                if path.is_dir() {
-                    if let Some(n) = path.file_name() {
-                        if n == ".wikid" {
-                            let parent = match path.parent() {
-                                Some(p) => p,
-                                None => return Err(".wikid had no parent".to_owned())
-                            };
-                            return Ok(match parent.to_str(){
-                                Some(s) => s.to_owned(),
-                                None => return Err("Could not resolve .wikid path".to_owned())
-                            });
-                        }
-                    }
-                }
+            // Check whether wikid directory exists
+            path.push(".wikid");
+            if path.exists() {
+                path.pop();
+                break Ok(path.as_os_str().to_str().expect("Path was corrupted").to_owned())
             }
-            path = match path.parent() {
-                Some(p) => p,
-                None => return Err("Wikid has not been initialized in this directory.".to_owned())
+            path.pop();
+
+            // Advance
+            if !path.pop() {
+                break Err("Not initialized in wikid directory".to_owned());
             };
         }
     }
@@ -131,6 +116,15 @@ impl Root {
             None => return Err("Origin did not have a url".to_owned())
         }.to_string())
     }
+
+    pub fn get_section(&self, path: &str) -> String {
+        for s in &self.sections {
+            if path.contains(&s.name) {
+                return s.name.clone();
+            }
+        }
+        "main".to_owned()
+    }
 }
 
 pub fn init(matches: &ArgMatches) -> MyResult<()> {
@@ -143,10 +137,6 @@ pub fn init(matches: &ArgMatches) -> MyResult<()> {
 
     if let Err(_) = fs::create_dir("code") {
         return Err("Could not create code directory".to_owned());
-    }
-
-    if let Err(_) = fs::create_dir("text") {
-        return Err("Could not create text directory".to_owned());
     }
 
     if let Err(_) = fs::create_dir("html") {

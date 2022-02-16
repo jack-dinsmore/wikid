@@ -1,9 +1,10 @@
 use crate::root::Root;
 use crate::build::file_queue::FileQueue;
 
-pub fn build_css(root: &Root, file_queue: &mut FileQueue) {
-    for sec in &root.sections {
-        file_queue.add(format!("css/{}.css", sec.name), format!(
+const DEFAULT_COLOR: &'static str = "#000";
+
+fn css_text(c: &str) -> String {
+    format!(
 "body {{
     font-size: 12 px;
     font-family: sans-serif;
@@ -26,7 +27,12 @@ h1, h2, h3, h4, h5 {{
     position: absolute;
     z-index: 1;
 }}
-", sec.color)
-);
+", c)
+}
+
+pub fn build_css(root: &Root, file_queue: &mut FileQueue) {
+    for sec in &root.sections {
+        file_queue.add(format!("css/{}.css", sec.name), css_text(&sec.color));
     }
+    file_queue.add("css/main.css".to_owned(), css_text(DEFAULT_COLOR));
 }

@@ -33,7 +33,7 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
     let compile_tree = Node::new();
     println!("Compiling {} files", compile_tree.size());
     let ref_map = compile_tree.ref_map(&root, matches.is_present("public"))?;
-    compile_tree.compile(&mut file_queue, &ref_map)?;
+    compile_tree.compile(&mut file_queue, &ref_map, matches.is_present("public"))?;
 
 
     // Write
@@ -55,5 +55,19 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
     file_queue.write(&target_dir)?;
 
     println!("Succeeded");
+
+    if matches.is_present("run") {
+        println!("{}", root.public_url);
+        let path = if matches.is_present("public") {
+            println!("Public url was {}", root.public_url);
+            unimplemented!();
+        } else {
+            format!("file://{}", Root::concat_root_dir("html/index.html")?)
+        };
+        if let Err(_) = open::that(&path) {
+            return Err(format!("Could not display website. Link searched was {}", path));
+        }
+    }
+
     Ok(())
 }

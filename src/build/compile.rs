@@ -23,14 +23,14 @@ enum LinkReturn {
     Pass
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum ListType {
     Ordered,
     Unordered,
 }
 
 /// An enum for the different kinds of commands that have been implemented
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum CommandTypes {
     // https://www.markdownguide.org/basic-syntax/
     NoCommand,
@@ -52,7 +52,6 @@ pub enum CommandTypes {
 
 pub struct Command {
     pub c_type: CommandTypes,
-    letters: String,
 }
 
 struct Modifiers {
@@ -215,9 +214,18 @@ impl PossibleLink {
 
 impl Command {
     pub fn new() -> Command {
-        Command {c_type: CommandTypes::Evaluating, letters: "".to_owned() }
+        Command {c_type: CommandTypes::Evaluating }
     }
     pub fn parse_command(&mut self, c: char) -> bool {
+        match self.c_type {
+            CommandTypes::Evaluating => (),
+            CommandTypes::HeaderProgress(_) => (),
+            CommandTypes::CodeProgress(_) => (),
+            CommandTypes::OrderedListProgress => (),
+            CommandTypes::MultiLatexProgress => (),
+            CommandTypes::Failed => return false,
+            _ => return false,
+        };
         self.c_type = match &self.c_type {
             CommandTypes::Evaluating => match c {
                 '#' => CommandTypes::HeaderProgress(1),
@@ -249,11 +257,7 @@ impl Command {
             },
             _ => self.c_type
         };
-        match self.c_type {
-            CommandTypes::NoCommand => false,
-            CommandTypes::Failed => false,
-            _ => {self.letters.push(c); true}
-        }
+        true
     }
 
     fn prefix(&self) -> String {
@@ -271,7 +275,7 @@ impl Command {
             CommandTypes::List(_) => "<li>".to_owned(),
             CommandTypes::Image => "".to_owned(),
             CommandTypes::MultiLatex => "\\[".to_owned(),
-            _ => self.letters.clone(),
+            _ => "".to_owned(),
         }
     }
 
@@ -287,10 +291,10 @@ impl Command {
             },
             CommandTypes::BlockQuote => "</blockquote>".to_owned(),
             CommandTypes::Code => "</code>".to_owned(),
-            CommandTypes::List(_) => "<li>".to_owned(),
+            CommandTypes::List(_) => "</li>".to_owned(),
             CommandTypes::Image => "".to_owned(),
             CommandTypes::MultiLatex => "\\]".to_owned(),
-            _ => self.letters.clone(),
+            _ => "".to_owned(),
         }
     }
 }
@@ -338,10 +342,20 @@ impl ParseState {
     fn new() -> ParseState {
         ParseState {list: None, previous_paragraph: false}
     }
+    fn terminal(&self) -> String{
+        if let Some(l) = self.list {
+            match l {
+                ListType::Ordered => "</ol>".to_owned(),
+                ListType::Unordered => "</ul>".to_owned()
+            }
+        } else {
+            "".to_owned()
+        }
+    }
 }
 
 
-pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap) -> MyResult<String> {
+pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResult<String> {
     // Turn code in the file "path" into some compiled code in the return type.
     let file = match File::open(path) {
         Ok(f) => f,
@@ -349,15 +363,26 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap) -> MyResult<String> {
     };
 
     let file_name = Path::new(path).file_name().expect("Incorrectly formatted path");
+
+    let root = Root::summon()?;
+    let section_name = root.get_section(path);
+    let css_name = if public {
+        format!("{}/css/{}.css", root.public_url.clone(), section_name)
+    } else {
+        format!("file://{}/html/css/{}.css", Root::get_root_dir().expect("No root directory"), section_name)
+    };
+
     let mut compiled_text : String = format!("<html>
 <head>
     <meta charset=\"utf-8\">
+    <link rel = \"stylesheet\" type = \"text/css\" href = \"{}\">
     <script src=\"https://polyfill.io/v3/polyfill.min.js?features=es6\"></script>
     <script id=\"MathJax-script\" async
             src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\">
     </script>
     <title>{}</title>
-</head><body>", file_name.to_str().expect("Incorrectly formatted path"));
+</head><body>", css_name, file_name.to_str().expect("Incorrectly formatted path"));
+
     let mut parse_state = ParseState::new();
 
     // Write header material
@@ -366,13 +391,15 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap) -> MyResult<String> {
     for (line_num, line) in io::BufReader::new(file).lines().enumerate() {
         compiled_text.push_str(&match parse_line(line.expect("Error in reading files"), ref_map, &mut parse_state) {
             Ok(l) => l,
-            Err(m) => return Err(format!("Line {}: {}", line_num, m)),
+            Err(m) => return Err(format!("File {} line {}: {}", path, line_num+1, m)),
         });
         compiled_text.push_str("\n");
     }
+    compiled_text.push_str(&parse_state.terminal());
 
     // Write footer material
-    compiled_text += "</body></html>";
+    
+    compiled_text += "</body></html>\n";
 
     Ok(compiled_text)
 }
@@ -381,6 +408,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
     let mut escaped = false;
     let mut possible_link = PossibleLink::new();
     let mut result = "".to_owned();
+    let mut before = "".to_owned();
     let mut command = Command::new();
     let mut modifiers = Modifiers::new();
 
@@ -435,17 +463,17 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
             Some(old_type) => match list_type {
                 ListType::Ordered => match old_type {
                     ListType::Ordered => (),
-                    ListType::Unordered => result = format!("</ul><ol>{}", result)
+                    ListType::Unordered => before = format!("</ul><ol>{}", result)
                 },
                 ListType::Unordered => match old_type {
                     ListType::Unordered => (),
-                    ListType::Ordered => result = format!("</ol><ul>{}", result)
+                    ListType::Ordered => before = format!("</ol><ul>{}", before)
                 }
             },
             None => {// Start new list
                 match list_type {
-                    ListType::Ordered => result = format!("<ol>{}", result),
-                    ListType::Unordered => result = format!("<ul>{}", result)
+                    ListType::Ordered => before = format!("<ol>{}", before),
+                    ListType::Unordered => before = format!("<ul>{}", before)
                 }
             }
         };
@@ -454,8 +482,8 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
     else {
         match parse_state.list {
             Some(old_type) => match old_type{
-                ListType::Ordered => result = format!("</ol>{}", result),
-                ListType::Unordered => result = format!("</ul>{}", result)
+                ListType::Ordered => before = format!("</ol>{}", before),
+                ListType::Unordered => before = format!("</ul>{}", before)
             },
             None => ()
         };
@@ -474,5 +502,5 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
         }
     }
     
-    Ok(format!("{}{}{}", command.prefix(), result, command.postfix()))
+    Ok(format!("{}{}{}{}", before, command.prefix(), result, command.postfix()))
 }

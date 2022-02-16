@@ -37,49 +37,49 @@ impl<'a> Iterator for TreeIter<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
+
         if !self.new {
-            let mut next_node = self.node;
-
-            // Find a layer with one more child
-            loop {
-                if self.path.len() < 2 {
-                    return None;
+            let mut me = *self.path.last().expect("Tree iterator path corrupted");
+            self.path.pop().expect("Tree iterator path corrupted");
+            let parent = match self.path.last() {
+                Some(p) => p,
+                None => return None // There was no parent.
+            };
+            
+            // Try going horizontally
+            let mut take_next_child = false;
+            let mut took_child = false;
+            for child in &parent.children {
+                if take_next_child {
+                    self.path.push(&child);
+                    me = &child;
+                    took_child = true;
                 }
-                let parent = self.path[self.path.len() - 2];
-                self.path.pop().expect("Tree iterator path corrupted");
-
-                let mut take_next_child = false;
-                let mut took_child = false;
-                for child in &parent.children {
-                    if take_next_child {
-                        self.path.push(&child);
-                        next_node = &child;
-                        took_child = true;
-                        break;
-                    }
-                    if **child == *next_node {
-                        // Take the next child
-                        take_next_child = true;
-                    }
+                if **child == *me {
+                    // Take the next child
+                    take_next_child = true;
                 }
-                if took_child {
-                    break;
-                }
+            }
+            if !took_child {
+                // Try going upwards. If there is no parent, the next iterator will fail.
+                return self.next();
             }
 
             // Descend to leaf
-            while !next_node.children.is_empty() {
-                self.path.push(&next_node.children[0]);
-                next_node = &next_node.children[0];
+            while !me.children.is_empty() {
+                self.path.push(&me.children[0]);
+                me = &me.children[0];
             }
-
-            self.node = next_node;
         }
         else {
             self.new = false;
         }
+        
+        if !self.path.last().expect("Path was corrupted").is_leaf {
+            return self.next();
+        }
 
-        let mut text : String = "text/".to_owned();
+        let mut text : String = "".to_owned();
         let mut previous = false;
         for n in &self.path {
             if previous {
@@ -88,9 +88,7 @@ impl<'a> Iterator for TreeIter<'a> {
             previous = true;
             text = text + &n.name[..];
         }
-        if !self.path.last().expect("Path was corrupted").is_leaf {
-            return self.next();
-        }
+
         Some(text)
     }
 }
@@ -99,7 +97,7 @@ impl Node {
     pub fn new() -> Node {
         let mut tree = Node { children: Vec::new(), name: ".".to_owned(), is_leaf: false};
 
-        tree.make(Root::concat_root_dir("text").expect("Could not find root dir"));
+        tree.make(Root::get_root_dir().expect("Could not find root dir"));
 
         tree
     }
@@ -107,6 +105,13 @@ impl Node {
     fn make (&mut self, node_path: String) {
         for new_path in fs::read_dir(node_path).expect("Could not open local paths") {
             let new_path = new_path.expect("Could not open path").path();
+
+            if match new_path.as_path().file_name() {
+                Some(e) => e == ".git" || e == "html" || e == ".wikid",
+                None => false
+            }{
+                continue;
+            }
             
             if match new_path.as_path().extension() {
                 Some(e) => e == "md",
@@ -130,9 +135,14 @@ impl Node {
         }
     }
 
-    pub fn compile(&self, file_queue: &mut FileQueue, ref_map: &RefMap) -> MyResult<()> {
+    pub fn compile(&self, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<()> {
         for path in self.iter() {
-            file_queue.add(path.to_owned(), compile_file(&path, ref_map)?);
+            let html_name = if path.ends_with("_toc.md") {
+                format!("{}index.html", &path[..path.len()-7])
+            } else {
+                format!("{}.html", &path[..path.len() - 3])
+            };
+            file_queue.add(html_name, compile_file(&path, ref_map, public)?);
         }
         Ok(())
     }

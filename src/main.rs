@@ -5,6 +5,7 @@
 // to generate arguments dynamically.
 extern crate clap;
 use clap::{Arg, App, SubCommand};
+use open;
 mod root;
 mod constants;
 mod build;
@@ -31,7 +32,10 @@ fn main() {
             .about("Compile markdown into html")
             .arg(Arg::with_name("public")
                 .short("p")
-                .help("Link with public links")))
+                .help("Link with public links"))
+            .arg(Arg::with_name("run")
+                .short("r")
+                .help("Open html after build")))
         .subcommand(SubCommand::with_name("section")
             .about("Compile markdown into html")
             .arg(Arg::with_name("new")
@@ -47,6 +51,8 @@ fn main() {
             .arg(Arg::with_name("force")
                 .short("f")
                 .help("Force a command")))
+        .subcommand(SubCommand::with_name("root")
+            .about("Display the root directory"))
         .get_matches();
 
     // You can handle information about subcommands by requesting their matches by name
@@ -77,6 +83,11 @@ fn main() {
                 println!("Listing sections failed: {}", msg);
             }
         }
+    } else if let Some(_) = matches.subcommand_matches("root") {
+        match root::Root::get_root_dir() {
+            Ok(f) => println!("Root: {}", f),
+            Err(_) => println!("Could not get root directory")
+        };
     }
     else{
         println!("You must provide a valid subcommand");
