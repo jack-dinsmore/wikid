@@ -5,7 +5,7 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use crate::constants::MyResult;
 use crate::build::refs::RefMap;
-use crate::build::file_queue::FileQueue;
+use chrono::Datelike;
 
 
 /// A struct for parsing links
@@ -61,6 +61,7 @@ struct Modifiers {
 struct ParseState {
     list: Option<ListType>,
     previous_paragraph: bool,
+    section_open: bool,
 }
 
 impl PossibleLink {
@@ -256,15 +257,20 @@ impl Command {
                 _ => CommandTypes::Failed,
             },
             _ => self.c_type
+            
         };
-        true
+        if let CommandTypes::NoCommand = self.c_type {
+            false
+        } else {
+            true
+        }
     }
 
     fn prefix(&self) -> String {
         match self.c_type {
             CommandTypes::Header(i) => match i {
                 1 => "<h1>".to_owned(),
-                2 => "<h2>".to_owned(),
+                2 => "<button class=\"collapsible\"><h2>".to_owned(),
                 3 => "<h3>".to_owned(),
                 4 => "<h4>".to_owned(),
                 5 => "<h5>".to_owned(),
@@ -283,7 +289,7 @@ impl Command {
         match self.c_type {
             CommandTypes::Header(i) => match i {
                 1 => "</h1>".to_owned(),
-                2 => "</h2>".to_owned(),
+                2 => "</h2></button><div class=\"section\">".to_owned(),
                 3 => "</h3>".to_owned(),
                 4 => "</h4>".to_owned(),
                 5 => "</h5>".to_owned(),
@@ -340,20 +346,29 @@ impl Modifiers {
 
 impl ParseState {
     fn new() -> ParseState {
-        ParseState {list: None, previous_paragraph: false}
+        ParseState {list: None, previous_paragraph: false, section_open: false }
     }
     fn terminal(&self) -> String{
-        if let Some(l) = self.list {
+        let mut out = if let Some(l) = self.list {
             match l {
                 ListType::Ordered => "</ol>".to_owned(),
                 ListType::Unordered => "</ul>".to_owned()
             }
         } else {
             "".to_owned()
+        };
+        if self.section_open {
+            out = format!("{}</div>", out);
         }
+        out
     }
 }
 
+fn get_footer() -> MyResult<String> {
+    let root = Root::summon()?;
+    Ok(format!("Copyright &copy; {year} Jack Dinsmore. Version {maj}.{min}",
+    year=chrono::Utc::now().year(), maj=root.wikid_version_major, min=root.wikid_version_minor))
+}
 
 pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResult<String> {
     // Turn code in the file "path" into some compiled code in the return type.
@@ -366,6 +381,25 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResu
 
     let root = Root::summon()?;
     let section_name = root.get_section(path);
+
+    let root_toc_path = if public {
+        format!("{}/index.html", root.public_url.clone())
+    } else {
+        format!("file://{}/html/index.html", Root::get_root_dir().expect("No root directory"))
+    };
+
+    let header = match root.get_section_path(path) {
+        Some(p) => {
+            println!("{}", p);
+            let sec_toc_path = if public {
+                format!("{}/{}/index.html", root.public_url.clone(), &p[2..])
+            } else {
+                format!("file://{}/html/{}/index.html", Root::get_root_dir().expect("No root directory"), &p[2..])
+            };
+            format!("<h2><a href=\"{}\">Home</a> > <a href=\"{}\">{}</a></h2>", root_toc_path, sec_toc_path, section_name)
+        },
+        None => format!("<h2><a href=\"{}\">Home</a></h2>", root_toc_path)
+    };
     let css_name = if public {
         format!("{}/css/{}.css", root.public_url.clone(), section_name)
     } else {
@@ -375,13 +409,17 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResu
     let mut compiled_text : String = format!("<html>
 <head>
     <meta charset=\"utf-8\">
-    <link rel = \"stylesheet\" type = \"text/css\" href = \"{}\">
+    <link rel = \"stylesheet\" type = \"text/css\" href = \"{css_name}\">
+    <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">
+    <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>
+    <link href=\"https://fonts.googleapis.com/css2?family=DM+Sans&family=Nunito&display=swap\" rel=\"stylesheet\">
     <script src=\"https://polyfill.io/v3/polyfill.min.js?features=es6\"></script>
     <script id=\"MathJax-script\" async
             src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\">
     </script>
-    <title>{}</title>
-</head><body>", css_name, file_name.to_str().expect("Incorrectly formatted path"));
+    <title>{all_name}</title>
+</head><body><div id=\"content\">{header}",
+    css_name=css_name, all_name=root.name, header=header);
 
     let mut parse_state = ParseState::new();
 
@@ -399,8 +437,25 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResu
 
     // Write footer material
     
-    compiled_text += "</body></html>\n";
+    compiled_text += "</div><div id=\"footer\">\n";
+    compiled_text += &get_footer()?;
+    compiled_text += "</div></body>
+<script>
+var coll = document.getElementsByClassName(\"collapsible\");
+var i;
 
+for (i = 0; i < coll.length; i++) {{
+    coll[i].addEventListener(\"click\", function() {{
+        this.classList.toggle(\"active\");
+        var content = this.nextElementSibling;
+        if (content.style.maxHeight === \"0px\"){{
+            content.style.maxHeight = content.scrollHeight+\"px\";
+        }} else {{
+            content.style.maxHeight = \"0px\";
+        }}
+    }});
+}}
+</script></html>\n";
     Ok(compiled_text)
 }
 
@@ -458,12 +513,22 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
             };
         }
     }
+    if let CommandTypes::Header(i) = command.c_type {
+        if i == 1 || i == 2 {
+            if parse_state.section_open {
+                before = format!("</div> {}", before);
+            }
+            if i == 2 {
+                parse_state.section_open = true;
+            }
+        }
+    }
     if let CommandTypes::List(list_type) = command.c_type {
         match parse_state.list {
             Some(old_type) => match list_type {
                 ListType::Ordered => match old_type {
                     ListType::Ordered => (),
-                    ListType::Unordered => before = format!("</ul><ol>{}", result)
+                    ListType::Unordered => before = format!("</ul><ol>{}", before)
                 },
                 ListType::Unordered => match old_type {
                     ListType::Unordered => (),

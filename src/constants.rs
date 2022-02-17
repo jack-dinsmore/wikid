@@ -6,6 +6,7 @@ pub type MyResult<T> = Result<T, String>;
 
 pub const WIKID_VERSION_MAJOR: u32 = 0;
 pub const WIKID_VERSION_MINOR: u32 = 0;
+const LIGHT_SHRINK: f32 = 0.2;
 
 #[derive(Debug, Deserialize)]
 pub struct Color {
@@ -14,9 +15,30 @@ pub struct Color {
     b: u8,
 }
 
+impl Color {
+    pub fn bw(&self) -> Color {
+        let sum = self.r  as u16 + self.g  as u16 + self.b as u16;
+        if sum > 387 {
+            Color { r:0, g:0, b:0 }
+        } else {
+            Color { r:255, g:255, b:255 }
+        }
+    }
+
+    pub fn light(&self) -> Color {
+        Color {
+            r: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.r) as f32 / 255.0)) as u8,
+            g: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.g) as f32 / 255.0)) as u8,
+            b: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.b) as f32 / 255.0)) as u8,
+        }
+    }
+}
+
 impl ToString for Color {
     fn to_string(&self) -> String {
-        format!("#{:x}{:x}{:x};", self.r, self.g, self.b)
+        format!("#{}{}{};", if self.r > 0 {format!("{:02x}", self.r)} else {"00".to_owned()},
+                            if self.g > 0 {format!("{:02x}", self.g)} else {"00".to_owned()},
+                            if self.b > 0 {format!("{:02x}", self.b)} else {"00".to_owned()})
     }
 }
 

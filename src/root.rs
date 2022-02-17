@@ -10,9 +10,9 @@ use crate::section::Section;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Root {
-    wikid_version_major: u32,
-    wikid_version_minor: u32,
-    name: String,
+    pub wikid_version_major: u32,
+    pub wikid_version_minor: u32,
+    pub name: String,
     pub public_url: String,
     pub sections: Vec<Section>,
     pub main_contents_level: u8, // Deepest level of the main table of contents
@@ -124,6 +124,15 @@ impl Root {
             }
         }
         "main".to_owned()
+    }
+
+    pub fn get_section_path<'a>(&self, path: &'a str) -> Option<&'a str> {
+        for s in &self.sections {
+            if let Some(index) = path.find(&s.name) {
+                return Some(&path[..index + s.name.len()]);
+            }
+        }
+        None
     }
 }
 
