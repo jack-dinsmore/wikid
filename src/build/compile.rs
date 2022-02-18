@@ -1,6 +1,7 @@
 use crate::root::Root;
 
 use std::fs::File;
+use crate::build::file_queue::FileQueue;
 use std::io::{self, BufRead};
 use std::path::Path;
 use crate::constants::MyResult;
@@ -24,7 +25,7 @@ enum LinkReturn {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum ListType {
+pub enum ListType {
     Ordered,
     Unordered,
 }
@@ -62,6 +63,9 @@ struct ParseState {
     list: Option<ListType>,
     previous_paragraph: bool,
     section_open: bool,
+    local_path: String,
+    imgs: Vec<(String, String)>,
+    fig_num: u32,
 }
 
 impl PossibleLink {
@@ -175,7 +179,7 @@ impl PossibleLink {
                 // Internal link
                 let (internal_name, internal_link) = match ref_map.get_link(&self.link_text) {
                     Some(i) => i,
-                    None => return Err("Could not find link".to_owned())
+                    None => return Err(format!("Could not find link {}", self.link_text))
                 };
                 if self.display_text.is_empty() {
                     (internal_name, internal_link)
@@ -195,21 +199,38 @@ impl PossibleLink {
         Ok(format!("<a href={}>{}</a>", href, display_text))
     }
 
-    fn make_img(&mut self, ref_map: &RefMap) -> MyResult<String> {
+    fn make_img(&mut self, parse_state: &mut ParseState, ref_map: &RefMap) -> MyResult<String> {
+        let sections = self.link_text.split('?').collect::<Vec<&str>>();
+        let (image_path, image_width) = if sections.len() == 1 {
+            (sections[0], 100)
+        } else if sections.len() == 2 {
+            (sections[0], match sections[1].parse::<i32>() {
+                Ok(i) => i,
+                Err(_) => return Err(format!("Argument {} was not an integer", sections[1]))
+            })
+        } else {
+            return Err(format!("Image had too many question marks in it. {}", self.link_text));
+        };
         // Guaranteed that self.progress is 3
         let href = match self.link_type {
-            '[' => self.link_text.clone(),
-            '{' => ref_map.url_stem.clone() + &self.link_text, // Internal link
+            '[' => image_path.to_owned(),
+            '{' => {parse_state.move_img(image_path)?;
+                format!("{}/{}/{}", ref_map.url_stem, parse_state.local_path, image_path)
+                }, // Internal link
             _ => return Err("Internal link parsing error".to_owned())
         };
         
         // Reset the link
         self.progress = 0;
-        self.display_text = "".to_owned();
         self.link_text = "".to_owned();
         self.link_type = '.';
-
-        Ok(format!("<a href=\"{}\"><img src=\"{}\" alt=\"{}\" /></a>", href, href, self.display_text))
+        
+        let res = Ok(format!("<center><a href=\"{href}\"><img width={width}% src=\"{href}\" alt=\"{display}\" /></a>
+        <div class=\"caption\" id=\"fig{fig_num}\"><b>Figure {fig_num}:</b> {display}</div></center>",
+        href=href, width=image_width, fig_num=parse_state.figure(), display=self.display_text));
+        
+        self.display_text = "".to_owned();
+        res
     }
 }
 
@@ -327,6 +348,7 @@ impl Modifiers {
                     return Err("Modifier misformatting".to_owned());
                 }
             }
+            self.modifiers.push(c);
             return Ok(Some(match c {
                 '*' => "<b>".to_owned(),
                 '_' => "<i>".to_owned(),
@@ -345,10 +367,14 @@ impl Modifiers {
 
 
 impl ParseState {
-    fn new() -> ParseState {
-        ParseState {list: None, previous_paragraph: false, section_open: false }
+    fn new(path: &str) -> ParseState {
+        let mut local_path = Path::new(path).parent().expect("Path had no parent").to_str().expect("Could not extract path").to_owned();
+        if local_path.starts_with("./") {
+            local_path = (&local_path[2..]).to_owned();
+        }
+        ParseState {list: None, previous_paragraph: false, section_open: false, local_path, imgs: Vec::new(), fig_num: 0 }
     }
-    fn terminal(&self) -> String{
+    fn terminal(self, file_queue: &mut FileQueue) -> String{
         let mut out = if let Some(l) = self.list {
             match l {
                 ListType::Ordered => "</ol>".to_owned(),
@@ -360,7 +386,25 @@ impl ParseState {
         if self.section_open {
             out = format!("{}</div>", out);
         }
+
+        file_queue.append_imgs(self.imgs);
+
         out
+    }
+
+    fn move_img(&mut self, link_text: &str) -> MyResult<()> {
+        let path_from = format!("{}/{}/{}", Root::get_root_dir()?, self.local_path, link_text);
+        let path_to = format!("{}/html/{}/{}", Root::get_root_dir()?, self.local_path, link_text);
+        if !Path::new(&path_from).exists() {
+            return Err(format!("Could not find image {}", path_from))
+        }
+        self.imgs.push((path_from, path_to));
+        Ok(())
+    }
+
+    fn figure(&mut self) -> u32 {
+        self.fig_num += 1;
+        self.fig_num
     }
 }
 
@@ -370,14 +414,12 @@ fn get_footer() -> MyResult<String> {
     year=chrono::Utc::now().year(), maj=root.wikid_version_major, min=root.wikid_version_minor))
 }
 
-pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResult<String> {
+pub fn compile_file<'a>(path: &'a str, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<String> {
     // Turn code in the file "path" into some compiled code in the return type.
     let file = match File::open(path) {
         Ok(f) => f,
         Err(_) => return Err(format!("Compile tree was corrupted: path {}", path))
     };
-
-    let file_name = Path::new(path).file_name().expect("Incorrectly formatted path");
 
     let root = Root::summon()?;
     let section_name = root.get_section(path);
@@ -390,7 +432,6 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResu
 
     let header = match root.get_section_path(path) {
         Some(p) => {
-            println!("{}", p);
             let sec_toc_path = if public {
                 format!("{}/{}/index.html", root.public_url.clone(), &p[2..])
             } else {
@@ -406,22 +447,37 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResu
         format!("file://{}/html/css/{}.css", Root::get_root_dir().expect("No root directory"), section_name)
     };
 
-    let mut compiled_text : String = format!("<html>
+    let mut compiled_text : String = format!(r#"<html>
 <head>
-    <meta charset=\"utf-8\">
-    <link rel = \"stylesheet\" type = \"text/css\" href = \"{css_name}\">
-    <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">
-    <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>
-    <link href=\"https://fonts.googleapis.com/css2?family=DM+Sans&family=Nunito&display=swap\" rel=\"stylesheet\">
-    <script src=\"https://polyfill.io/v3/polyfill.min.js?features=es6\"></script>
-    <script id=\"MathJax-script\" async
-            src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\">
+    <meta charset="utf-8">
+    <link rel="stylesheet" type = "text/css" href = "{css_name}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans&family=Nunito&display=swap" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async
+            src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+    <script>
+window.MathJax = {{
+    tex: {{
+        macros: {{
+            bm: ["{{\boldsymbol #1}}",1],
+            parens: ["\left( #1 \right)", 1],
+            braces: ["\left\{{ #1 \right\}}", 1],
+            brackets: ["\left[ #1 \right]", 1],
+            eval: ["\left. #1 \right|", 1],
+            fraci: ["{{#1}} / {{#2}}", 2],
+            expp: ["\exp\left( #1 \right)", 1],
+        }}
+    }}
+}}
     </script>
     <title>{all_name}</title>
-</head><body><div id=\"content\">{header}",
+</head><body><div id="content">{header}"#,
     css_name=css_name, all_name=root.name, header=header);
 
-    let mut parse_state = ParseState::new();
+    let mut parse_state = ParseState::new(path);
 
     // Write header material
 
@@ -433,7 +489,7 @@ pub fn compile_file<'a>(path: &'a str, ref_map: &RefMap, public: bool) -> MyResu
         });
         compiled_text.push_str("\n");
     }
-    compiled_text.push_str(&parse_state.terminal());
+    compiled_text.push_str(&parse_state.terminal(file_queue));
 
     // Write footer material
     
@@ -485,7 +541,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
         else if let CommandTypes::Label = command.c_type {
             return Ok("".to_owned());
         }
-        else if modifiers.is_latex() {
+        else if c != '$' && modifiers.is_latex() {
             result.push(c);
         }
         else if let CommandTypes::MultiLatex = command.c_type {
@@ -502,12 +558,12 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
                     LinkReturn::Pushed => (),
                     LinkReturn::Failed(s) => result.push_str(&s),
                     LinkReturn::Done => result.push_str(&match command.c_type {
-                        CommandTypes::Image => possible_link.make_img(ref_map)?,
+                        CommandTypes::Image => possible_link.make_img(parse_state, ref_map)?,
                         _ => possible_link.make(ref_map)?
                     }),
-                    LinkReturn::Pass => match modifiers.check(c)? {
+                    LinkReturn::Pass =>  match modifiers.check(c)? {
                         Some(s) => result.push_str(&s),
-                        None => result.push(c) 
+                        None => result.push(c)
                     }// Check if it's a bold modifier
                 }
             };

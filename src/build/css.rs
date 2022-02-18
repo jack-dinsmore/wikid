@@ -78,6 +78,12 @@ a:hover {{
     transition: max-height 0.2s ease-out;
 }}
 
+.caption {{
+    font-size: 14px;
+    padding-top: 1em;
+    padding:bottom: 1em;
+}}
+
 .tooltip .tooltiptext {{
     visibility: hidden;
     width: 120px;

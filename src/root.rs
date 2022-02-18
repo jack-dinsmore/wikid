@@ -4,7 +4,6 @@ use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::*;
 use crate::constants::*;
-use std::path::{Path};
 use git2::Repository;
 use crate::section::Section;
 

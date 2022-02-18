@@ -1,16 +1,20 @@
-use std::fs::{create_dir, File};
+use std::fs::{self, create_dir, File};
 use std::collections::HashMap;
 use crate::constants::MyResult;
-use crate::root::Root;
 use std::io::Write;
 
 pub struct FileQueue {
     map: HashMap<String, String>,
+    imgs: Vec<(String, String)>,
 }
 
 impl FileQueue {
     pub fn new() -> FileQueue {
-        FileQueue { map: HashMap::new() }
+        FileQueue { map: HashMap::new(), imgs: Vec::new() }
+    }
+
+    pub fn append_imgs(&mut self, imgs: Vec<(String, String)>) {
+        self.imgs.extend(imgs);
     }
 
     pub fn write(self, target_dir: &str) -> MyResult<()> {
@@ -38,6 +42,13 @@ impl FileQueue {
                 return Err("Could not write to all files".to_owned());
             };
         }
+
+        for (from, to) in self.imgs {
+            if let Err(_) = fs::copy(&from, &to) {
+                return Err(format!("Could not move image to {}", to));
+            }
+        }
+
         Ok(())
     }
 

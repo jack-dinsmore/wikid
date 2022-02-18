@@ -56,7 +56,7 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
             Err(_) => return Err("Could not open table of contents".to_owned())
         };
 
-        if let Err(e) = file.write_all(&format!("* [{0}]{{0}}\n", name).as_bytes()) {
+        if let Err(_) = file.write_all(&format!("* [{0}]{{0}}\n", name).as_bytes()) {
             return Err("Could not add section name to toc.".to_owned());
         }
     }

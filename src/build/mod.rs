@@ -1,7 +1,7 @@
 use crate::constants::*;
 use clap::{ArgMatches};
 use crate::root::Root;
-use std::fs::{remove_dir_all, create_dir, read_dir, File};
+use std::fs::{remove_dir_all, create_dir};
 use crate::build::file_queue::FileQueue;
 use crate::build::compile_tree::Node;
 
@@ -33,6 +33,8 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
     let compile_tree = Node::new();
     println!("Compiling {} files", compile_tree.size());
     let ref_map = compile_tree.ref_map(&root, matches.is_present("public"))?;
+    println!("Refmap was {:?}", ref_map);
+
     compile_tree.compile(&mut file_queue, &ref_map, matches.is_present("public"))?;
 
 

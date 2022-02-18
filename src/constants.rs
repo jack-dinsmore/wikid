@@ -1,6 +1,5 @@
 use std::str::{FromStr};
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{self, Visitor, MapAccess};
+use serde::{Serialize, Deserialize, Serializer};
 
 pub type MyResult<T> = Result<T, String>;
 

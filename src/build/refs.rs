@@ -6,10 +6,12 @@ use crate::constants::MyResult;
 use crate::build::compile::{Command, CommandTypes};
 use crate::root::Root;
 
+#[derive(Debug)]
 pub struct RefMap {
     posts: HashMap<String, (String, String)>,// interior_label, (exterior_label, link)
     secs: HashMap<String, (String, [u32;5], String)>,// interior_label, (exterior_label, number, link)
     eqs: HashMap<String, (u32, String)>,// interior_Label, (eqn number, link)
+    figures: HashMap<String, (u32, String)>,// interior_Label, (eqn number, link)
     projects: HashMap<String, (String, String)>,// interior_label, (external_label, link)
     vocab: HashMap<String, String>,// display name, link
     pub url_stem: String,
@@ -22,13 +24,14 @@ impl RefMap {
         let eqs = HashMap::new();
         let projects = HashMap::new();
         let vocab = HashMap::new();
+        let figures = HashMap::new();
         let url_stem = if public {
             root.public_url.clone()
         } else {
             format!("file://{}/html", Root::get_root_dir().expect("No root directory"))
         };
 
-        RefMap { posts, secs, eqs, projects, vocab, url_stem }
+        RefMap { posts, secs, eqs, projects, vocab, figures, url_stem }
     }
 
     /// Scan through file looking for sections, equations, projects, and vocab.
@@ -41,7 +44,8 @@ impl RefMap {
         let file_name = Path::new(path).file_name().expect("Incorrectly formatted path");
 
         let mut label = "".to_owned();
-        let mut eq_num = 0;
+        let mut eq_num = 1;
+        let mut fig_num = 1;
         let mut sec_num = [0; 5];
         let mut header_index = 0;
         let mut bare_link = self.url_stem.to_owned() + &path[1..path.len()-3];// Remove .md
@@ -57,25 +61,6 @@ impl RefMap {
         // Write center material
         for (line_num, line) in io::BufReader::new(file).lines().enumerate() {
             let line = line.expect("Error in reading files");
-            if let Some(c) = line.chars().nth(0) {
-                if c == '~' {
-                    // Label has been found
-                    label = line[1..].to_owned();
-                    loop {
-                        match label.chars().nth(0) {
-                            Some(c) => if c != ' ' { break } else { label = label[1..].to_owned() },
-                            None => return Err(format!("File {} line {}: Label line was empty", path, line_num+1))
-                        }
-                    }
-                    loop {
-                        match label.chars().last() {
-                            Some(c) => if c != ' ' { break } else { label = label[..label.len()-2].to_owned() },
-                            None => return Err("Label line was empty".to_owned())
-                        }
-                    }
-                }
-                continue;
-            }
 
             let mut command = Command::new();
             let mut command_arg = "".to_owned();
@@ -102,18 +87,46 @@ impl RefMap {
             };
 
             if !label.is_empty() {
+                println!("Encountered label {}", label);
                 match &command.c_type {
-                    CommandTypes::Header(i) => {self.secs.insert(label.to_owned(), (
+                    CommandTypes::Header(_) => {self.secs.insert(label.to_owned(), (
                         command_arg,
                         sec_num,
                         format!("{}.html-sec-{}", bare_link, sec_num.iter().map( |&n| n.to_string() + "-").collect::<String>())
                     ));},
                     CommandTypes::MultiLatex => {self.eqs.insert(label.to_owned(), (
                         eq_num,
-                        format!("{}.html-eq-{}", bare_link, eq_num)
-                    ));},
-                    _ => ()
+                        format!("{}.html#eq{}", bare_link, eq_num)
+                    )); eq_num += 1;},
+                    CommandTypes::Image => {self.figures.insert(label.to_owned(), (
+                        fig_num,
+                        format!("{}.html#fig{}", bare_link, fig_num)
+                    )); fig_num += 1;},
+                    _ => {
+                        println!("Unused label {} with command type {:?}", label, command.c_type);
+                    }
                 }
+                label = "".to_owned();
+            }
+
+            if let Some(c) = line.chars().nth(0) {
+                if c == '~' {
+                    // Label has been found
+                    label = line[1..].to_owned();
+                    loop {
+                        match label.chars().nth(0) {
+                            Some(c) => if c != ' ' { break } else { label = label[1..].to_owned() },
+                            None => return Err(format!("File {} line {}: Label line was empty", path, line_num+1))
+                        }
+                    }
+                    loop {
+                        match label.chars().last() {
+                            Some(c) => if c != ' ' { break } else { label = label[..label.len()-2].to_owned() },
+                            None => return Err("Label line was empty".to_owned())
+                        }
+                    }
+                }
+                continue;
             }
         }
         Ok(())
@@ -146,6 +159,9 @@ impl RefMap {
         }
         else if self.vocab.contains_key(label) {
             Some((label.to_owned(), self.vocab[label].clone()))
+        }
+        else if self.figures.contains_key(label) {
+            Some((format!("Fig. {}", self.figures[label].0), self.figures[label].1.clone()))
         }
         else {
             None

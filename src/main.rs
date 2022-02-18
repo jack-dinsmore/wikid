@@ -5,7 +5,6 @@
 // to generate arguments dynamically.
 extern crate clap;
 use clap::{Arg, App, SubCommand};
-use open;
 mod root;
 mod constants;
 mod build;

@@ -17,7 +17,6 @@ struct TreeIter<'a> {
     new: bool,
      // Helper variables
     path: Vec<&'a Node>,
-    node: &'a Node,
 }
 
 impl<'a> TreeIter<'a> {
@@ -29,7 +28,7 @@ impl<'a> TreeIter<'a> {
             node = &node.children[0];
         }
         path.push(node);
-        return Self {new: true, path, node}
+        return Self {new: true, path}
     }
 }
 
@@ -142,7 +141,8 @@ impl Node {
             } else {
                 format!("{}.html", &path[..path.len() - 3])
             };
-            file_queue.add(html_name, compile_file(&path, ref_map, public)?);
+            let end_text = compile_file(&path, file_queue, ref_map, public)?;
+            file_queue.add(html_name, end_text);
         }
         Ok(())
     }
