@@ -31,7 +31,7 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
     build_css(&root, &mut file_queue);
 
     // Compile
-    let compile_tree = Node::new();
+    let compile_tree = Node::new()?;
     println!("Compiling {} files", compile_tree.size());
     let ref_map = compile_tree.ref_map(public)?;
 

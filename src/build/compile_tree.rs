@@ -93,16 +93,19 @@ impl<'a> Iterator for TreeIter<'a> {
 }
 
 impl Node {
-    pub fn new() -> Node {
+    pub fn new() -> MyResult<Node> {
         let mut tree = Node { children: Vec::new(), name: ".".to_owned(), is_leaf: false};
 
-        tree.make(Root::get_path_from_local("text").expect("Could not access text directory"));
+        tree.make(Root::get_path_from_local("text").expect("Could not access text directory"))?;
 
-        tree
+        Ok(tree)
     }
 
-    fn make (&mut self, node_path: String) {
-        for new_path in fs::read_dir(node_path).expect("Could not open local paths") {
+    fn make (&mut self, node_path: String) -> MyResult<()>{
+        for new_path in match fs::read_dir(&node_path) {
+            Ok(p) => p,
+            Err(_) => return Err(format!("Could not open path {}", node_path))
+        } {
             let new_path = new_path.expect("Could not open path").path();
 
             if match new_path.as_path().file_name() {
@@ -128,10 +131,12 @@ impl Node {
                     Some(f) => f.to_str().expect("String did not convert").to_owned(),
                     None => panic!("Could not find a file name")
                 }, false);
-                new_node.make(new_path.into_os_string().into_string().expect("String did not convert"));
+                new_node.make(new_path.into_os_string().into_string().expect("String did not convert"))?;
                 self.children.push(new_node)
             }
         }
+
+        Ok(())
     }
 
     pub fn compile(&self, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<()> {

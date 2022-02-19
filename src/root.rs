@@ -50,9 +50,22 @@ impl Root {
     }
 
     pub fn get_link_from_local(&self, local_dir: &str, public: bool) -> MyResult<String> {
+        let mut no_space_local = local_dir.to_owned();
+        for i in 32..47u8 {
+            no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
+        }
+        for i in 58..65u8 {
+            no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
+        }
+        for i in 91..97u8 {
+            no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
+        }
+        for i in 123..127u8 {
+            no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
+        }
         match public {
-            true => Ok(format!("{}/{}", self.public_url, local_dir)),
-            false => Ok(format!("file://{}/{}", Self::get_root_dir()?, local_dir))
+            true => Ok(format!("{}/{}", self.public_url, no_space_local)),
+            false => Ok(format!("file://{}/{}", Self::get_root_dir()?, no_space_local))
         }
     }
 
@@ -130,10 +143,9 @@ impl Root {
         "main".to_owned()
     }
 
-    pub fn rename(&mut self, matches: &ArgMatches) -> MyResult<()>{
-        let name = matches.value_of("name").expect("name was required");
-
-        self.name = name.to_owned();
+    pub fn rename(&mut self, matches: &ArgMatches) -> MyResult<()> {
+        let name = matches.value_of("name").expect("name is a required argument").to_string();
+        self.name = name;
         self.write()
     }
 }
@@ -154,7 +166,11 @@ pub fn init(matches: &ArgMatches) -> MyResult<()> {
         return Err("Could not create target directory".to_owned());
     }
 
-    if let Err(_) = File::create("_toc.md") {
+    if let Err(_) = fs::create_dir("text") {
+        return Err("Could not create target directory".to_owned());
+    }
+
+    if let Err(_) = File::create("text/_toc.md") {
         return Err("Could not create table of contents".to_owned());
     }
 

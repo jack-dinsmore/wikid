@@ -95,14 +95,15 @@ fn main() {
             Ok(f) => println!("Root: {}", f),
             Err(_) => println!("Could not get root directory")
         };
-    } else if let Some(_) = matches.subcommand_matches("rename") {
+    } else if let Some(matches) = matches.subcommand_matches("rename") {
         let mut root = match Root::summon() {
             Ok(r) => r,
             Err(_) => {println!("Could not summon root"); return; }
         };
-        if let Err(msg) =  root.rename(&matches) {
+        if let Err(msg) = root.rename(&matches) {
             println!("{}", msg);
         }
+        println!("Renamed wikid blog.");
     }
     else{
         println!("You must provide a valid subcommand");
