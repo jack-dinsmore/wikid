@@ -1,7 +1,7 @@
 use clap::ArgMatches;
 use serde::{Serialize, Deserialize};
 use std::str::{FromStr};
-use std::io::{stdin, BufReader, BufRead, Write};
+use std::io::{stdin, Write};
 use std::fs::{self, File, remove_dir_all, OpenOptions};
 use crate::constants::*;
 use crate::root::Root;
@@ -43,35 +43,35 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
 
     let sec = Section::new(name.to_string(), color);
     root.sections.push(sec);
+    let mut section_path = Root::get_path_from_local("text/")?;
+    section_path.push_str(name);
 
-    root.write()?;
+    if let Err(_) = fs::create_dir(&section_path) {
+        return Err("Could not create section directory.".to_owned());
+    }
+    if let Err(_) = File::create(format!("{}/_toc.md", section_path)) {
+        return Err("Could not create section table of contents.".to_owned());
+    }
 
     // Add to the toc
     {
         let mut file = match OpenOptions::new()
         .write(true)
         .append(true)
-        .open(Root::concat_root_dir("_toc.md")?) {
+        .open(Root::get_path_from_local("text/_toc.md")?) {
             Ok(f) => f,
             Err(_) => return Err("Could not open table of contents".to_owned())
         };
 
-        if let Err(_) = file.write_all(&format!("* [{0}]{{0}}\n", name).as_bytes()) {
+        if let Err(_) = file.write_all(&format!("* [{0}]{{{0}/_toc}}\n", name).as_bytes()) {
             return Err("Could not add section name to toc.".to_owned());
         }
     }
 
-
-    let mut section_path = Root::concat_root_dir("text/")?;
-    section_path.push_str(name);
-
-    if let Err(_) = fs::create_dir(&section_path) {
-        return Err("Could not create section directory.".to_owned());
-    }
-
-
-    if let Err(_) = File::create(format!("{}/_toc.md", section_path)) {
-        return Err("Could not create section table of contents.".to_owned());
+    // Write changes 
+    if let Err(e) = root.write() {
+        root.sections.pop();
+        return Err(e);
     }
 
     println!("Created section");
@@ -82,7 +82,7 @@ pub fn add_section(matches: &ArgMatches) -> MyResult<()> {
 pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
     let name = matches.value_of("delete").expect("DELETE_NAME was required");
 
-    let files = match fs::read_dir(Root::concat_root_dir(&format!("{}", name))?) {
+    let files = match fs::read_dir(Root::get_path_from_local(&format!("text/{}", name))?) {
         Ok(p) => p,
         Err(_) => return Err("That section did not exist".to_owned())
     };
@@ -110,32 +110,7 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
     // Delete the section
     let mut root = Root::summon()?;
 
-    {
-        let mut new_toc = String::new();
-        let reader = BufReader::new(match File::open(Root::concat_root_dir("_toc.md")?) {
-            Ok(f) => f,
-            Err(_) => return Err("Could not open the table of contents file".to_owned())
-        });
-        for line in reader.lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => continue
-            };
-            if !line.contains(&format!("[{}]", name)) {
-                new_toc.push_str(&line);
-                new_toc.push_str("\n");
-            }
-        }
-        let mut toc = match File::create(Root::concat_root_dir("_toc.md")?) {
-            Ok(f) => f,
-            Err(_) => return Err("Could not open the table of contents".to_owned())
-        };
-        if let Err(_) = toc.write_all(&new_toc.as_bytes()) {
-            return Err("Could not write to the table of contents file".to_owned());
-        };
-    }
-
-    if let Err(_) = remove_dir_all(format!("{}", name)) {
+    if let Err(_) = remove_dir_all(Root::get_path_from_local(&format!("text/{}", name))?) {
         return Err("Cannot remove the section file".to_owned());
     };
     let index = root.sections.iter().position(|x| x.name == name).unwrap();
@@ -147,7 +122,7 @@ pub fn delete_section(matches: &ArgMatches) -> MyResult<()> {
     Ok(())
 }
 
-pub fn list_sections(matches: &ArgMatches) -> MyResult<()> {
+pub fn list_sections() -> MyResult<()> {
     for sec in Root::summon()?.sections {
         println!("{}", sec.name);
     }

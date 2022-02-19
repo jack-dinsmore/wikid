@@ -36,7 +36,6 @@ impl<'a> Iterator for TreeIter<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-
         if !self.new {
             let mut me = *self.path.last().expect("Tree iterator path corrupted");
             self.path.pop().expect("Tree iterator path corrupted");
@@ -53,6 +52,7 @@ impl<'a> Iterator for TreeIter<'a> {
                     self.path.push(&child);
                     me = &child;
                     took_child = true;
+                    break;
                 }
                 if **child == *me {
                     // Take the next child
@@ -96,7 +96,7 @@ impl Node {
     pub fn new() -> Node {
         let mut tree = Node { children: Vec::new(), name: ".".to_owned(), is_leaf: false};
 
-        tree.make(Root::get_root_dir().expect("Could not find root dir"));
+        tree.make(Root::get_path_from_local("text").expect("Could not access text directory"));
 
         tree
     }
@@ -137,22 +137,22 @@ impl Node {
     pub fn compile(&self, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<()> {
         for path in self.iter() {
             let html_name = if path.ends_with("_toc.md") {
-                format!("{}index.html", &path[..path.len()-7])
+                format!("{}index.html", &path[2..path.len()-7])
             } else {
-                format!("{}.html", &path[..path.len() - 3])
+                format!("{}.html", &path[2..path.len() - 3])
             };
-            let end_text = compile_file(&path, file_queue, ref_map, public)?;
+            let end_text = compile_file(&format!("text/{}", &path[2..]), file_queue, ref_map, public)?;
             file_queue.add(html_name, end_text);
         }
         Ok(())
     }
 
-    pub fn ref_map(&self, root: &Root, public: bool) -> MyResult<RefMap> {
-        let mut ref_map = RefMap::new(root, public);
+    pub fn ref_map(&self, public: bool) -> MyResult<RefMap> {
+        let mut ref_map = RefMap::new(public);
         for path in self.iter() {
-            ref_map.add_file(&path)?;
+            ref_map.add_file(&format!("text/{}", &path[2..]))?;
         }
-        ref_map.add_glossary(&Root::concat_root_dir("_glossary.md").expect("Root directory corrupted"))?;
+        ref_map.add_glossary(&Root::get_path_from_local("_glossary.md").expect("Root directory corrupted"))?;
         Ok(ref_map)
     }
 

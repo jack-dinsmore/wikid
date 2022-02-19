@@ -9,7 +9,7 @@ mod root;
 mod constants;
 mod build;
 mod section;
-use root::init;
+use root::{init, Root};
 use crate::constants::*;
 use crate::section::{add_section, delete_section, list_sections};
 use build::build;
@@ -20,6 +20,7 @@ fn main() {
         .version(&version_text[..])
         .author("Jack Dinsmore <jtdinsmo@mit.edu>")
         .about("Compiles wiki and blog posts into HTML")
+
         .subcommand(SubCommand::with_name("init")
             .about("Initializes a wiki")
             .arg(Arg::with_name("name")
@@ -27,6 +28,7 @@ fn main() {
                 .required(true))
             .arg(Arg::with_name("nogit")
                 .help("Initiate repo without git")))
+
         .subcommand(SubCommand::with_name("build")
             .about("Compile markdown into html")
             .arg(Arg::with_name("public")
@@ -35,8 +37,9 @@ fn main() {
             .arg(Arg::with_name("run")
                 .short("r")
                 .help("Open html after build")))
+
         .subcommand(SubCommand::with_name("section")
-            .about("Compile markdown into html")
+            .about("Manage sections")
             .arg(Arg::with_name("new")
                 .short("n")
                 .long("new")
@@ -50,8 +53,15 @@ fn main() {
             .arg(Arg::with_name("force")
                 .short("f")
                 .help("Force a command")))
+
         .subcommand(SubCommand::with_name("root")
             .about("Display the root directory"))
+
+        .subcommand(SubCommand::with_name("rename")
+            .about("Rename the wiki")
+            .arg(Arg::with_name("name")
+                .help("Name to give the wiki")
+                .required(true)))
         .get_matches();
 
     // You can handle information about subcommands by requesting their matches by name
@@ -60,13 +70,11 @@ fn main() {
         if let Err(msg) = init(matches) {
             println!("Init failed: {}", msg);
         }
-    }
-    else if let Some(matches) = matches.subcommand_matches("build") {
+    } else if let Some(matches) = matches.subcommand_matches("build") {
         if let Err(msg) = build(matches) {
             println!("Build failed: {}", msg);
         }
-    }
-    else if let Some(matches) = matches.subcommand_matches("section") {
+    } else if let Some(matches) = matches.subcommand_matches("section") {
         if matches.is_present("new") {
             if let Err(msg) = add_section(matches) {
                 println!("Adding a section failed: {}", msg);
@@ -78,7 +86,7 @@ fn main() {
             }
         }
         else {
-            if let Err(msg) = list_sections(matches) {
+            if let Err(msg) = list_sections() {
                 println!("Listing sections failed: {}", msg);
             }
         }
@@ -87,6 +95,14 @@ fn main() {
             Ok(f) => println!("Root: {}", f),
             Err(_) => println!("Could not get root directory")
         };
+    } else if let Some(_) = matches.subcommand_matches("rename") {
+        let mut root = match Root::summon() {
+            Ok(r) => r,
+            Err(_) => {println!("Could not summon root"); return; }
+        };
+        if let Err(msg) =  root.rename(&matches) {
+            println!("{}", msg);
+        }
     }
     else{
         println!("You must provide a valid subcommand");

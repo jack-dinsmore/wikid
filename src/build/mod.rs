@@ -15,8 +15,9 @@ use css::build_css;
 
 pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
     let root = Root::summon()?;
-
-    if matches.is_present("public") {
+    
+    let public = matches.is_present("public");
+    if public {
         println!("Public build");
         if root.public_url == "" {
             return Err("You must first set the public url".to_owned());
@@ -32,15 +33,14 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
     // Compile
     let compile_tree = Node::new();
     println!("Compiling {} files", compile_tree.size());
-    let ref_map = compile_tree.ref_map(&root, matches.is_present("public"))?;
-    println!("Refmap was {:?}", ref_map);
+    let ref_map = compile_tree.ref_map(public)?;
 
-    compile_tree.compile(&mut file_queue, &ref_map, matches.is_present("public"))?;
+    compile_tree.compile(&mut file_queue, &ref_map, public)?;
 
 
     // Write
     let mut target_existed = true;
-    let target_dir = Root::concat_root_dir("html/")?;
+    let target_dir = Root::get_path_from_local("html/")?;
     if let Err(_) = remove_dir_all(&target_dir) {
         target_existed = false;
     }
@@ -59,13 +59,7 @@ pub fn build<'a>(matches: &ArgMatches<'a>) -> MyResult<()> {
     println!("Succeeded");
 
     if matches.is_present("run") {
-        println!("{}", root.public_url);
-        let path = if matches.is_present("public") {
-            println!("Public url was {}", root.public_url);
-            unimplemented!();
-        } else {
-            format!("file://{}", Root::concat_root_dir("html/index.html")?)
-        };
+        let path = root.get_link_from_local("html/index.html", public)?;
         if let Err(_) = open::that(&path) {
             return Err(format!("Could not display website. Link searched was {}", path));
         }

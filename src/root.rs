@@ -49,15 +49,19 @@ impl Root {
         }
     }
 
-    pub fn concat_root_dir(right: &str) -> MyResult<String> {
-        let mut root_dir = Root::get_root_dir()?;
-        root_dir.push_str("/");
-        root_dir.push_str(right);
-        Ok(root_dir)
+    pub fn get_link_from_local(&self, local_dir: &str, public: bool) -> MyResult<String> {
+        match public {
+            true => Ok(format!("{}/{}", self.public_url, local_dir)),
+            false => Ok(format!("file://{}/{}", Self::get_root_dir()?, local_dir))
+        }
+    }
+
+    pub fn get_path_from_local(local_dir: &str) -> MyResult<String> {
+        Ok(format!("{}/{}", Self::get_root_dir()?, local_dir))
     }
 
     pub fn summon() -> MyResult<Root> {
-        let paths = match fs::read_dir(Root::concat_root_dir(".wikid")?) {
+        let paths = match fs::read_dir(Root::get_path_from_local(".wikid")?) {
             Ok(p) => p,
             Err(_) => return Err("Wikid directory was invalid".to_owned())
         };
@@ -90,7 +94,7 @@ impl Root {
             Ok(t) => t
         };
 
-        let mut file = match File::create(Root::concat_root_dir(".wikid/wikid.json")?) {
+        let mut file = match File::create(Root::get_path_from_local(".wikid/wikid.json")?) {
             Ok(f) => f,
             Err(_) => return Err("Could not create wikid.json".to_owned())
         };
@@ -101,6 +105,7 @@ impl Root {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_github_url() -> MyResult<String> {
         let repo = match Repository::open(Root::get_root_dir()?) {
             Ok(r) => r,
@@ -125,13 +130,11 @@ impl Root {
         "main".to_owned()
     }
 
-    pub fn get_section_path<'a>(&self, path: &'a str) -> Option<&'a str> {
-        for s in &self.sections {
-            if let Some(index) = path.find(&s.name) {
-                return Some(&path[..index + s.name.len()]);
-            }
-        }
-        None
+    pub fn rename(&mut self, matches: &ArgMatches) -> MyResult<()>{
+        let name = matches.value_of("name").expect("name was required");
+
+        self.name = name.to_owned();
+        self.write()
     }
 }
 
@@ -153,6 +156,10 @@ pub fn init(matches: &ArgMatches) -> MyResult<()> {
 
     if let Err(_) = File::create("_toc.md") {
         return Err("Could not create table of contents".to_owned());
+    }
+
+    if let Err(_) = fs::write(".gitignore", "text/\n.wikid/\n.gitignore".as_bytes()) {
+        return Err("Could not create .gitignore".to_owned())
     }
 
     if !matches.is_present("nogit") {

@@ -171,7 +171,7 @@ impl PossibleLink {
         out
     }
 
-    fn make(&mut self, ref_map: &RefMap, ) -> MyResult<String> {
+    fn make(&mut self, ref_map: &RefMap) -> MyResult<String> {
         // Guaranteed that self.progress is 3
         let (display_text, href) = match self.link_type {
             '[' => (self.display_text.clone(), self.link_text.clone()),
@@ -189,6 +189,7 @@ impl PossibleLink {
             }
             _ => return Err("Internal link parsing error".to_owned())
         };
+
         
         // Reset the link
         self.progress = 0;
@@ -199,14 +200,15 @@ impl PossibleLink {
         Ok(format!("<a href={}>{}</a>", href, display_text))
     }
 
-    fn make_img(&mut self, parse_state: &mut ParseState, ref_map: &RefMap) -> MyResult<String> {
-        let sections = self.link_text.split('?').collect::<Vec<&str>>();
-        let (image_path, image_width) = if sections.len() == 1 {
-            (sections[0], 100)
-        } else if sections.len() == 2 {
-            (sections[0], match sections[1].parse::<i32>() {
+    fn make_img(&mut self, parse_state: &mut ParseState, public: bool) -> MyResult<String> {
+        let root = Root::summon()?;
+        let link_parts = self.link_text.split('?').collect::<Vec<&str>>();
+        let (image_path, image_width) = if link_parts.len() == 1 {
+            (link_parts[0], 100)
+        } else if link_parts.len() == 2 {
+            (link_parts[0], match link_parts[1].parse::<i32>() {
                 Ok(i) => i,
-                Err(_) => return Err(format!("Argument {} was not an integer", sections[1]))
+                Err(_) => return Err(format!("Argument {} was not an integer", link_parts[1]))
             })
         } else {
             return Err(format!("Image had too many question marks in it. {}", self.link_text));
@@ -215,7 +217,7 @@ impl PossibleLink {
         let href = match self.link_type {
             '[' => image_path.to_owned(),
             '{' => {parse_state.move_img(image_path)?;
-                format!("{}/{}/{}", ref_map.url_stem, parse_state.local_path, image_path)
+                root.get_link_from_local(&format!("html/{}/{}", &parse_state.local_path[5..], image_path), public)?
                 }, // Internal link
             _ => return Err("Internal link parsing error".to_owned())
         };
@@ -393,8 +395,9 @@ impl ParseState {
     }
 
     fn move_img(&mut self, link_text: &str) -> MyResult<()> {
-        let path_from = format!("{}/{}/{}", Root::get_root_dir()?, self.local_path, link_text);
-        let path_to = format!("{}/html/{}/{}", Root::get_root_dir()?, self.local_path, link_text);
+        // self.local_path already contains the text directory.
+        let path_from = Root::get_path_from_local(&format!("{}/{}", self.local_path, link_text))?;
+        let path_to = Root::get_path_from_local(&format!("html/{}/{}", &self.local_path[5..], link_text))?;
         if !Path::new(&path_from).exists() {
             return Err(format!("Could not find image {}", path_from))
         }
@@ -414,38 +417,25 @@ fn get_footer() -> MyResult<String> {
     year=chrono::Utc::now().year(), maj=root.wikid_version_major, min=root.wikid_version_minor))
 }
 
-pub fn compile_file<'a>(path: &'a str, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<String> {
+pub fn compile_file<'a>(local_path: &'a str, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<String> {
     // Turn code in the file "path" into some compiled code in the return type.
-    let file = match File::open(path) {
+    let global_path = Root::get_path_from_local(local_path)?;
+    let file = match File::open(&global_path) {
         Ok(f) => f,
-        Err(_) => return Err(format!("Compile tree was corrupted: path {}", path))
+        Err(_) => return Err(format!("Compile tree was corrupted in main: path {}", global_path))
     };
 
     let root = Root::summon()?;
-    let section_name = root.get_section(path);
+    let section_name = root.get_section(local_path);
+    let root_toc_path = root.get_link_from_local("html/index.html", public)?;
 
-    let root_toc_path = if public {
-        format!("{}/index.html", root.public_url.clone())
+    let header = if section_name != "main" {
+        let sec_toc_path = root.get_link_from_local(&format!("html/{}/index.html", section_name), public)?;
+        format!("<h2><a href=\"{}\">Home</a> > <a href=\"{}\">{}</a></h2>", root_toc_path, sec_toc_path, section_name)
     } else {
-        format!("file://{}/html/index.html", Root::get_root_dir().expect("No root directory"))
+        format!("<h2><a href=\"{}\">Home</a></h2>", root_toc_path)
     };
-
-    let header = match root.get_section_path(path) {
-        Some(p) => {
-            let sec_toc_path = if public {
-                format!("{}/{}/index.html", root.public_url.clone(), &p[2..])
-            } else {
-                format!("file://{}/html/{}/index.html", Root::get_root_dir().expect("No root directory"), &p[2..])
-            };
-            format!("<h2><a href=\"{}\">Home</a> > <a href=\"{}\">{}</a></h2>", root_toc_path, sec_toc_path, section_name)
-        },
-        None => format!("<h2><a href=\"{}\">Home</a></h2>", root_toc_path)
-    };
-    let css_name = if public {
-        format!("{}/css/{}.css", root.public_url.clone(), section_name)
-    } else {
-        format!("file://{}/html/css/{}.css", Root::get_root_dir().expect("No root directory"), section_name)
-    };
+    let css_name = root.get_link_from_local(&format!("html/css/{}.css", section_name), public)?;
 
     let mut compiled_text : String = format!(r#"<html>
 <head>
@@ -477,15 +467,15 @@ window.MathJax = {{
 </head><body><div id="content">{header}"#,
     css_name=css_name, all_name=root.name, header=header);
 
-    let mut parse_state = ParseState::new(path);
+    let mut parse_state = ParseState::new(local_path);
 
     // Write header material
 
     // Write center material
     for (line_num, line) in io::BufReader::new(file).lines().enumerate() {
-        compiled_text.push_str(&match parse_line(line.expect("Error in reading files"), ref_map, &mut parse_state) {
+        compiled_text.push_str(&match parse_line(line.expect("Error in reading files"), ref_map, &mut parse_state, public) {
             Ok(l) => l,
-            Err(m) => return Err(format!("File {} line {}: {}", path, line_num+1, m)),
+            Err(m) => return Err(format!("File {} line {}: {}", local_path, line_num+1, m)),
         });
         compiled_text.push_str("\n");
     }
@@ -515,7 +505,7 @@ for (i = 0; i < coll.length; i++) {{
     Ok(compiled_text)
 }
 
-fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut ParseState) -> MyResult<String> {
+fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut ParseState, public: bool) -> MyResult<String> {
     let mut escaped = false;
     let mut possible_link = PossibleLink::new();
     let mut result = "".to_owned();
@@ -558,7 +548,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
                     LinkReturn::Pushed => (),
                     LinkReturn::Failed(s) => result.push_str(&s),
                     LinkReturn::Done => result.push_str(&match command.c_type {
-                        CommandTypes::Image => possible_link.make_img(parse_state, ref_map)?,
+                        CommandTypes::Image => possible_link.make_img(parse_state, public)?,
                         _ => possible_link.make(ref_map)?
                     }),
                     LinkReturn::Pass =>  match modifiers.check(c)? {
