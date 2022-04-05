@@ -6,8 +6,8 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use crate::constants::MyResult;
 use crate::build::refs::RefMap;
-use chrono::Datelike;
-
+use chrono::{Datelike, Month};
+use num_traits::FromPrimitive;
 
 /// A struct for parsing links
 struct PossibleLink {
@@ -413,8 +413,10 @@ impl ParseState {
 
 fn get_footer() -> MyResult<String> {
     let root = Root::summon()?;
-    Ok(format!("Copyright &copy; {year} Jack Dinsmore. Version {maj}.{min}",
-    year=chrono::Utc::now().year(), maj=root.wikid_version_major, min=root.wikid_version_minor))
+    let now = chrono::Utc::now();
+    Ok(format!("Copyright &copy; {year} Jack Dinsmore. &emsp;Updated {month} {day}. &emsp;Version {maj}.{min}",
+    year=now.year(), month=Month::from_u32(now.month()).expect("Month was invalid").name(), day=now.day(),
+        maj=root.wikid_version_major, min=root.wikid_version_minor))
 }
 
 pub fn compile_file<'a>(local_path: &'a str, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<String> {
