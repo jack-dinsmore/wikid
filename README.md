@@ -19,6 +19,8 @@ As for text formats, markdown is used. External links are written as `[link text
 Reference to figure 1: []{fig:one}.
 ```
 
+Footnotes are also available[Inline in brackets.] when implemented.
+
 ## LaTeX
 
 The `amsmath` package is provided, and the macros `\bm`, `\parens`, `\brackets`, `\braces`, `\eval`, `\fraci`, and `\expp` have been provided.
@@ -27,3 +29,4 @@ The `amsmath` package is provided, and the macros `\bm`, `\parens`, `\brackets`,
 * Increment versions
 * Separate captions from images so that you can have a figure with multiple images and one caption. Add formatting to the caption.
 * Tables
+* Footnotes

@@ -54,6 +54,10 @@ a:hover {{
     width: 50em;
 }}
 
+.footnote {{
+    font-size: 14px;
+}}
+
 .collapsible {{
     background-color: #fff;
     color: white;

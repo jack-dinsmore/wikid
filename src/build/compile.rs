@@ -20,6 +20,7 @@ struct PossibleLink {
 enum LinkReturn {
     Pushed,
     Failed(String),
+    Footnote(String),
     Done,
     Pass
 }
@@ -66,12 +67,17 @@ struct ParseState {
     local_path: String,
     imgs: Vec<(String, String)>,
     fig_num: u32,
+    footnotes: Vec<String>,
 }
 
 impl PossibleLink {
     fn new() -> PossibleLink {
-        PossibleLink{ display_text: "".to_owned(), link_text: "".to_owned(),
-            link_type: '.', progress: 0 }
+        PossibleLink {
+            display_text: "".to_owned(),
+            link_text: "".to_owned(),
+            link_type: '.',
+            progress: 0,
+        }
     }
 
     /// Tries to add a character. If fails, returns the text to be written. Otherwise returns None.
@@ -84,7 +90,7 @@ impl PossibleLink {
                     return LinkReturn::Pushed;
                 }
                 else {
-                    return LinkReturn::Failed(self.clear());
+                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -95,7 +101,7 @@ impl PossibleLink {
                     return LinkReturn::Pushed;
                 }
                 else {
-                    return LinkReturn::Failed(self.clear());
+                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -106,7 +112,7 @@ impl PossibleLink {
                     return LinkReturn::Pushed;
                 }
                 else {
-                    return LinkReturn::Failed(self.clear());
+                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -117,7 +123,7 @@ impl PossibleLink {
                     return LinkReturn::Pushed;
                 }
                 else {
-                    return LinkReturn::Failed(self.clear());
+                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -127,7 +133,7 @@ impl PossibleLink {
                     return LinkReturn::Done;
                 }
                 else {
-                    return LinkReturn::Failed(self.clear());
+                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -137,7 +143,7 @@ impl PossibleLink {
                     return LinkReturn::Done;
                 }
                 else {
-                    return LinkReturn::Failed(self.clear());
+                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -146,25 +152,30 @@ impl PossibleLink {
         match self.progress {
             0 => return LinkReturn::Pass,
             1 => self.display_text.push(c),
-            2 => return LinkReturn::Failed(self.clear()),
+            2 => return LinkReturn::Footnote(self.prep_for_footnote(c)),
             3 => self.link_text.push(c),
             _ => panic!("Progress should not get this high")
         };
         LinkReturn::Pushed
     }
 
-    fn clear(&mut self) -> String {
-        let mut out = "(".to_owned();
-        out.push_str(&self.display_text);
-        self.display_text = "".to_owned();
-        if self.progress == 2 {
-            out.push(')');
-        }
+    fn prep_for_footnote(&mut self, c: char) -> String {
+        let s = self.clear(c);
+        return (&s[1..(s.len()-1)]).to_owned()
+    }
+
+    fn clear(&mut self, c: char) -> String {
+        let mut out = match self.display_text.is_empty() {
+            true => String::new(),
+            false => format!("[{}", self.display_text),
+        };
         if self.progress == 3 {
             out.push(self.link_type);
             out.push_str(&self.link_text);
         }
+        out.push(c);
         self.progress = 0;
+        self.display_text = "".to_owned();
         self.display_text = "".to_owned();
         self.link_text = "".to_owned();
         self.link_type = '.';
@@ -334,7 +345,7 @@ impl Modifiers {
     }
 
     fn check(&mut self, c: char) -> MyResult<Option<String>> {
-        if c == '*' || c == '_' || c == '`' || c == '$' {
+        if c == '*' || c == '_' || c == '`' || c == '$' || c == ']' {
             if self.modifiers.contains(&c) {
                 if *self.modifiers.last().unwrap() == c {
                     self.modifiers.pop();
@@ -343,6 +354,7 @@ impl Modifiers {
                         '_' => "</i>".to_owned(),
                         '`' => "</code>".to_owned(),
                         '$' => "\\)".to_owned(),
+                        ']' => "</div>".to_owned(),
                         _ => panic!("Unknown modifier")
                     }));
                 }
@@ -356,6 +368,7 @@ impl Modifiers {
                 '_' => "<i>".to_owned(),
                 '`' => "<code>".to_owned(),
                 '$' => "\\(".to_owned(),
+                '[' => "<div>".to_owned(),
                 _ => panic!("Unknown modifier")
             }));
         }
@@ -374,7 +387,15 @@ impl ParseState {
         if local_path.starts_with("./") {
             local_path = (&local_path[2..]).to_owned();
         }
-        ParseState {list: None, previous_paragraph: false, section_open: false, local_path, imgs: Vec::new(), fig_num: 0 }
+        ParseState {
+            list: None,
+            previous_paragraph: false,
+            section_open: false,
+            local_path,
+            imgs: Vec::new(),
+            fig_num: 0,
+            footnotes: Vec::new(),
+        }
     }
     fn terminal(self, file_queue: &mut FileQueue) -> String{
         let mut out = if let Some(l) = self.list {
@@ -387,6 +408,10 @@ impl ParseState {
         };
         if self.section_open {
             out = format!("{}</div>", out);
+        }
+
+        for (i, footnote) in self.footnotes.into_iter().enumerate() {
+            out.push_str(&format!("<div id=\"footnote{i}\" class=\"footnote\"><sup>{i}</sup> {f}</div>", i=i+1, f=footnote))
         }
 
         file_queue.append_imgs(self.imgs);
@@ -408,6 +433,12 @@ impl ParseState {
     fn figure(&mut self) -> u32 {
         self.fig_num += 1;
         self.fig_num
+    }
+
+    fn footnote(&mut self, text: String, c: char) -> String {
+        // Return display text and add footnote text to vector
+        self.footnotes.push(text);
+        return format!("<sup><a href=\"#footnote{num}\">{num}</a></sup>{c}", num=self.footnotes.len(), c=c)
     }
 }
 
@@ -549,6 +580,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
                 _ => match possible_link.try_add(c) { // Try a link
                     LinkReturn::Pushed => (),
                     LinkReturn::Failed(s) => result.push_str(&s),
+                    LinkReturn::Footnote(s) => result.push_str(&parse_state.footnote(s, c)),
                     LinkReturn::Done => result.push_str(&match command.c_type {
                         CommandTypes::Image => possible_link.make_img(parse_state, public)?,
                         _ => possible_link.make(ref_map)?
