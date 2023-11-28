@@ -185,7 +185,7 @@ impl PossibleLink {
     fn make(&mut self, ref_map: &RefMap) -> MyResult<String> {
         // Guaranteed that self.progress is 3
         let (display_text, href) = match self.link_type {
-            '[' => (self.display_text.clone(), self.link_text.clone()),
+            '(' => (self.display_text.clone(), self.link_text.clone()),
             '{' => {
                 // Internal link
                 let (internal_name, internal_link) = match ref_map.get_link(&self.link_text) {
@@ -485,13 +485,16 @@ pub fn compile_file<'a>(local_path: &'a str, file_queue: &mut FileQueue, ref_map
 window.MathJax = {{
     tex: {{
         macros: {{
-            bm: ["{{\boldsymbol #1}}",1],
-            parens: ["\left( #1 \right)", 1],
-            braces: ["\left\{{ #1 \right\}}", 1],
-            brackets: ["\left[ #1 \right]", 1],
-            eval: ["\left. #1 \right|", 1],
+            bm: ["\\mathbf {{#1}}",1],
+            parens: ["\\left( #1 \\right)", 1],
+            braces: ["\\left\{{ #1 \\right\}}", 1],
+            brackets: ["\\left[ #1 \\right]", 1],
+            eval: ["\\left. #1 \\right|", 1],
             fraci: ["{{#1}} / {{#2}}", 2],
-            expp: ["\exp\left( #1 \right)", 1],
+            expp: ["\\exp\\left( #1 \right)", 1],
+            bra: ["\\left\\langle #1 \\right|", 1],
+            ket: ["\\left| #1 \\right\\rangle", 1],
+            braket: ["\\langle {{#1}} | {{#2}} \\rangle", 2],
         }}
     }}
 }}
