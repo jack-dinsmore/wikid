@@ -1,10 +1,8 @@
-use std::str::{FromStr};
+use std::str::FromStr;
 use serde::{Serialize, Deserialize, Serializer};
 
 pub type MyResult<T> = Result<T, String>;
 
-pub const WIKID_VERSION_MAJOR: u32 = 0;
-pub const WIKID_VERSION_MINOR: u32 = 0;
 const LIGHT_SHRINK: f32 = 0.2;
 
 #[derive(Debug, Deserialize)]

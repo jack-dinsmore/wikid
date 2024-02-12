@@ -1,5 +1,5 @@
 use std::{fs, env};
-use clap::{ArgMatches};
+use clap::Parser;
 use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::*;
@@ -9,19 +9,27 @@ use crate::section::Section;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Root {
-    pub wikid_version_major: u32,
-    pub wikid_version_minor: u32,
+    pub wikid_version_major: String,
+    pub wikid_version_minor: String,
     pub name: String,
     pub public_url: String,
     pub sections: Vec<Section>,
     pub main_contents_level: u8, // Deepest level of the main table of contents
 }
 
+#[derive(Parser)]
+pub struct InitSettings {
+    /// Name of the wiki
+    name: String,
+    #[arg(long)]
+    /// Set to turn of git init
+    nogit: bool,
+}
 
 impl Root {
     fn new(name: String) -> Root {
-        Root { wikid_version_major: WIKID_VERSION_MAJOR,
-            wikid_version_minor: WIKID_VERSION_MINOR,
+        Root { wikid_version_major: env!("CARGO_PKG_VERSION_MAJOR").to_owned(),
+            wikid_version_minor: env!("CARGO_PKG_VERSION_MINOR").to_owned(),
             name,
             public_url: String::new(),
             sections: Vec::new(),
@@ -87,13 +95,14 @@ impl Root {
             if !path.is_dir() {
                 if let Some(n) = path.file_name() {
                     if n == "wikid.json" {
-                        return Ok(match serde_json::from_str(&match fs::read_to_string(path) {
+                        let root_str = match fs::read_to_string(path) {
                             Ok(s) => s,
                             Err(_) => return Err("Could not open wikid.json".to_owned())
-                        }) {
+                        };
+                        return Ok(match serde_json::from_str(&root_str) {
                             Ok(r) => r,
-                            Err(_) => return Err("Wikid.json was corrupted".to_owned())
-                        });
+                            Err(e) => return Err(format!("Wikid.json was corrupted ({})", e))
+                        })
                     }
                 }
             }
@@ -143,52 +152,51 @@ impl Root {
         "main".to_owned()
     }
 
-    pub fn rename(&mut self, matches: &ArgMatches) -> MyResult<()> {
-        let name = matches.value_of("name").expect("name is a required argument").to_string();
-        self.name = name;
-        self.write()
-    }
+    // pub fn rename(&mut self, matches: &ArgMatches) -> MyResult<()> {
+    //     let name = matches.value_of("name").expect("name is a required argument").to_string();
+    //     self.name = name;
+    //     self.write()
+    // }
 }
 
-pub fn init(matches: &ArgMatches) -> MyResult<()> {
-    let name = matches.value_of("name")
-                                .expect("name is a required argument")
-                                .to_string();
-    if let Err(_) = fs::create_dir(".wikid") {
-        return Err("Could not create .wikid directory".to_owned());
-    }
-
-    if let Err(_) = fs::create_dir("code") {
-        return Err("Could not create code directory".to_owned());
-    }
-
-    if let Err(_) = fs::create_dir("html") {
-        return Err("Could not create target directory".to_owned());
-    }
-
-    if let Err(_) = fs::create_dir("text") {
-        return Err("Could not create target directory".to_owned());
-    }
-
-    if let Err(_) = File::create("text/_toc.md") {
-        return Err("Could not create table of contents".to_owned());
-    }
-
-    if let Err(_) = fs::write(".gitignore", "text/\n.wikid/\n.gitignore".as_bytes()) {
-        return Err("Could not create .gitignore".to_owned())
-    }
-
-    if !matches.is_present("nogit") {
-        if let Err(_) = Repository::init(".") {
-            return Err("Could not initialize github repository in this directory".to_owned());
+impl InitSettings {
+    pub fn run(&self) -> MyResult<()> {
+        if let Err(_) = fs::create_dir(".wikid") {
+            return Err("Could not create .wikid directory".to_owned());
         }
-    }
-    else {
-        println!("Creating wiki without github integration");
-    }
-    println!("Created wiki {}", name);
 
-    let root = Root::new(name);
+        if let Err(_) = fs::create_dir("code") {
+            return Err("Could not create code directory".to_owned());
+        }
 
-    root.write()
+        if let Err(_) = fs::create_dir("html") {
+            return Err("Could not create target directory".to_owned());
+        }
+
+        if let Err(_) = fs::create_dir("text") {
+            return Err("Could not create target directory".to_owned());
+        }
+
+        if let Err(_) = File::create("text/_toc.md") {
+            return Err("Could not create table of contents".to_owned());
+        }
+
+        if let Err(_) = fs::write(".gitignore", "text/\n.wikid/\n.gitignore".as_bytes()) {
+            return Err("Could not create .gitignore".to_owned())
+        }
+
+        if !self.nogit {
+            if let Err(_) = Repository::init(".") {
+                return Err("Could not initialize github repository in this directory".to_owned());
+            }
+        }
+        else {
+            println!("Creating wiki without github integration");
+        }
+        println!("Created wiki {}", self.name);
+
+        let root = Root::new(self.name.clone());
+
+        root.write()
+    }
 }
