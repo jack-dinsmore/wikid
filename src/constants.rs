@@ -43,13 +43,13 @@ impl FromStr for Color {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if match s.bytes().nth(0) {
-            None => return Err("Color must be 8 characters long"),
+            None => return Err("Color must be 7 characters long"),
             Some(c) => c
         } != 35 {// Pound
             return Err("Color must start with #");
         }
-        if s.len() != 8 {
-            return Err("Color must be 8 characters long");
+        if s.len() != 7 {
+            return Err("Color must be 7 characters long");
         }
 
         let r = match u8::from_str_radix(&s[1..3], 16) {

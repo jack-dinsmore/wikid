@@ -11,7 +11,7 @@ mod build;
 mod section;
 use build::BuildSettings;
 use root::InitSettings;
-use section::{AddSettings, RmSettings};
+use section::AddSettings;
 
 #[derive(Subcommand)]
 enum Commands {
@@ -21,8 +21,7 @@ enum Commands {
     Build(BuildSettings),
     /// Add a section
     Add(AddSettings),
-    /// Remove a section
-    Rm(RmSettings),
+    // Rm(RmSettings),
     // Mv(MvSettings),
     // Root(RootSettings),
 }
@@ -42,7 +41,7 @@ fn main() {
         Commands::Init(m) => m.run(),
         Commands::Build(m) => m.run(),
         Commands::Add(m) => m.run(),
-        Commands::Rm(m) => m.run(),
+        // Commands::Rm(m) => m.run(),
         // Commands::Mv(m) => m.run(),
     };
 

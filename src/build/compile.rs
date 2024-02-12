@@ -462,7 +462,7 @@ pub fn compile_file<'a>(local_path: &'a str, file_queue: &mut FileQueue, ref_map
     let section_name = root.get_section(local_path);
     let root_toc_path = root.get_link_from_local("html/index.html", public)?;
 
-    let header = if section_name != "main" {
+    let header = if section_name != "text" {
         let sec_toc_path = root.get_link_from_local(&format!("html/{}/index.html", section_name), public)?;
         format!("<h2><a href=\"{}\">Home</a> > <a href=\"{}\">{}</a></h2>", root_toc_path, sec_toc_path, section_name)
     } else {

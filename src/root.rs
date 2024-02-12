@@ -1,11 +1,12 @@
+use std::path::Path;
 use std::{fs, env};
 use clap::Parser;
 use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::*;
 use crate::constants::*;
-use git2::Repository;
 use crate::section::Section;
+use git2::Repository;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Root {
@@ -13,8 +14,6 @@ pub struct Root {
     pub wikid_version_minor: String,
     pub name: String,
     pub public_url: String,
-    pub sections: Vec<Section>,
-    pub main_contents_level: u8, // Deepest level of the main table of contents
 }
 
 #[derive(Parser)]
@@ -32,8 +31,6 @@ impl Root {
             wikid_version_minor: env!("CARGO_PKG_VERSION_MINOR").to_owned(),
             name,
             public_url: String::new(),
-            sections: Vec::new(),
-            main_contents_level: 2,
         }
     }
 
@@ -143,13 +140,34 @@ impl Root {
         }.to_string())
     }
 
+    /// Returns the name of the current section
     pub fn get_section(&self, path: &str) -> String {
-        for s in &self.sections {
-            if path.contains(&s.name) {
-                return s.name.clone();
+        let path = Path::new(path);
+        path.parent().unwrap().file_name().unwrap().to_str().unwrap().to_owned()
+    }
+
+    /// Returns the names of all sections
+    pub fn get_sections(&self) -> Vec<Section> {
+        let mut sections = Vec::new();
+        self.get_sections_in_dir(Path::new(&Self::get_root_dir().unwrap()), &mut sections);
+        sections
+    }
+
+    /// Returns the sections of all sections
+    pub fn get_sections_in_dir(&self, path: &Path, sections: &mut Vec<Section>) {
+        for file in fs::read_dir(path).unwrap() {
+            let file_path = file.unwrap().path();
+            if fs::metadata(&file_path).unwrap().is_dir() {
+                self.get_sections_in_dir(&file_path, sections);
+            } else {
+                if file_path.file_name().unwrap() == ".wikid.json" {
+                    let text = fs::read_to_string(&file_path).unwrap();
+                    let save_section = serde_json::from_str(&text).unwrap();
+                    let name = file_path.parent().unwrap().file_name().unwrap().to_str().to_owned().unwrap();
+                    sections.push(Section::from_save_section(save_section, name))
+                }
             }
         }
-        "main".to_owned()
     }
 
     // pub fn rename(&mut self, matches: &ArgMatches) -> MyResult<()> {
