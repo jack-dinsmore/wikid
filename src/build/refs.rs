@@ -142,7 +142,13 @@ impl RefMap {
         unimplemented!();
     }
 
-    pub fn get_link(&self, label: &str) -> Option<(String, String)> {
+    /// Get the text label and HTML link for a hyperlink.
+    pub fn get_link(&self, original_label: &str, local_path: Option<&str>) -> Option<(String, String)> {
+        // Try a global path
+        let label = &match local_path {
+            Some(s) => format!("{}/{}", s, original_label),
+            None => original_label.to_owned(),
+        };
         if self.posts.contains_key(label) {
             Some((self.posts[label].0.clone(), self.posts[label].1.clone()))
         } else if self.secs.contains_key(label) {
@@ -156,7 +162,13 @@ impl RefMap {
         } else if self.figures.contains_key(label) {
             Some((format!("Fig. {}", self.figures[label].0), self.figures[label].1.clone()))
         } else {
-            None
+            if local_path.is_some() {
+                // Now try a local path
+                self.get_link(original_label, None)
+            } else {
+                // There was no such object
+                None
+            }
         }
     }
 }

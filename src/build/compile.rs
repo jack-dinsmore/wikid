@@ -182,13 +182,13 @@ impl PossibleLink {
         out
     }
 
-    fn make(&mut self, ref_map: &RefMap) -> MyResult<String> {
+    fn make(&mut self, ref_map: &RefMap, local_path: Option<&str>) -> MyResult<String> {
         // Guaranteed that self.progress is 3
         let (display_text, href) = match self.link_type {
             '(' => (self.display_text.clone(), self.link_text.clone()),
             '{' => {
                 // Internal link
-                let (internal_name, internal_link) = match ref_map.get_link(&self.link_text) {
+                let (internal_name, internal_link) = match ref_map.get_link(&self.link_text, local_path) {
                     Some(i) => i,
                     None => return Err(format!("Could not find link {}", self.link_text))
                 };
@@ -450,8 +450,10 @@ fn get_footer() -> MyResult<String> {
         maj=root.wikid_version_major, min=root.wikid_version_minor))
 }
 
+/// Turn code in the file "path" into some compiled code in the return type.
 pub fn compile_file<'a>(local_path: &'a str, file_queue: &mut FileQueue, ref_map: &RefMap, public: bool) -> MyResult<String> {
-    // Turn code in the file "path" into some compiled code in the return type.
+    // Get the parent path, excluding the text/
+
     let global_path = Root::get_path_from_local(local_path)?;
     let file = match File::open(&global_path) {
         Ok(f) => f,
@@ -504,12 +506,18 @@ window.MathJax = {{
     css_name=css_name, all_name=root.name, header=header);
 
     let mut parse_state = ParseState::new(local_path);
+    let local_entire_parent_path = &Path::new(local_path).parent().unwrap().to_str().unwrap().to_owned();
+    let local_parent_path = if local_entire_parent_path.len() <= 4 {
+        None
+    } else {
+        Some(&local_entire_parent_path[5..])
+    };
 
     // Write header material
 
     // Write center material
     for (line_num, line) in io::BufReader::new(file).lines().enumerate() {
-        compiled_text.push_str(&match parse_line(line.expect("Error in reading files"), ref_map, &mut parse_state, public) {
+        compiled_text.push_str(&match parse_line(line.expect("Error in reading files"), ref_map, &mut parse_state, public, local_parent_path) {
             Ok(l) => l,
             Err(m) => return Err(format!("File {} line {}: {}", local_path, line_num+1, m)),
         });
@@ -541,7 +549,7 @@ for (i = 0; i < coll.length; i++) {{
     Ok(compiled_text)
 }
 
-fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut ParseState, public: bool) -> MyResult<String> {
+fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut ParseState, public: bool, local_path: Option<&str>) -> MyResult<String> {
     let mut escaped = false;
     let mut possible_link = PossibleLink::new();
     let mut result = "".to_owned();
@@ -586,7 +594,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
                     LinkReturn::Footnote(s) => result.push_str(&parse_state.footnote(s, c)),
                     LinkReturn::Done => result.push_str(&match command.c_type {
                         CommandTypes::Image => possible_link.make_img(parse_state, public)?,
-                        _ => possible_link.make(ref_map)?
+                        _ => possible_link.make(ref_map, local_path)?
                     }),
                     LinkReturn::Pass =>  match modifiers.check(c)? {
                         Some(s) => result.push_str(&s),

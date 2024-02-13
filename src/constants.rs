@@ -33,7 +33,7 @@ impl Color {
 
 impl ToString for Color {
     fn to_string(&self) -> String {
-        format!("#{}{}{};", if self.r > 0 {format!("{:02x}", self.r)} else {"00".to_owned()},
+        format!("#{}{}{}", if self.r > 0 {format!("{:02x}", self.r)} else {"00".to_owned()},
                             if self.g > 0 {format!("{:02x}", self.g)} else {"00".to_owned()},
                             if self.b > 0 {format!("{:02x}", self.b)} else {"00".to_owned()})
     }

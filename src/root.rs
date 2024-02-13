@@ -54,9 +54,13 @@ impl Root {
         }
     }
 
+    /// Get the URL-formatted link to a file inside the website. If `public` is formatted, it will 
+    /// be an HTTPS link. Otherwise it will be file://.
     pub fn get_link_from_local(&self, local_dir: &str, public: bool) -> MyResult<String> {
         let mut no_space_local = local_dir.to_owned();
+        no_space_local = no_space_local.replace(b'%' as char, &format!("%{:02x}", b'%'));
         for i in 32..47u8 {
+            if i == b'%' {continue;}
             no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
         }
         for i in 58..65u8 {
