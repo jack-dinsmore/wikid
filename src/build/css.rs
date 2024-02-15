@@ -3,7 +3,7 @@ use crate::root::Root;
 use crate::constants::Color;
 use crate::build::file_queue::FileQueue;
 
-const DEFAULT_COLOR: &'static str = "#000000";
+const DEFAULT_COLOR: &'static str = "#2200ff";
 
 fn css_text(c: &str) -> String {
     let bw_color = Color::from_str(c).expect("Color was corrupted").bw();

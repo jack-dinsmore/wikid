@@ -116,7 +116,7 @@ impl RefMap {
                     loop {
                         match label.chars().nth(0) {
                             Some(c) => if c != ' ' { break } else { label = label[1..].to_owned() },
-                            None => return Err(format!("File {} line {}: Label line was empty", local_path, line_num+1))
+                            None => return Err(format!("File {}:{}:0: Label line was empty", local_path, line_num+1))
                         }
                     }
                     loop {
