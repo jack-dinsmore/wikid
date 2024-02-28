@@ -3,20 +3,36 @@ use crate::root::Root;
 use crate::constants::Color;
 use crate::build::file_queue::FileQueue;
 
-const DEFAULT_COLOR: &'static str = "#2200ff";
+const DEFAULT_COLOR: &'static str = "#aa22ff";
 
 fn css_text(c: &str) -> String {
-    let bw_color = Color::from_str(c).expect("Color was corrupted").bw();
-    let light_color = Color::from_str(c).expect("Color was corrupted").light();
+    let bw = Color::from_str(c).expect("Color was corrupted").bw().to_string();
+    let light = Color::from_str(c).expect("Color was corrupted").light().to_string();
+    let text = Color::from_str(c).expect("Color was corrupted").text().to_string();
+    let bg = Color::from_str(c).expect("Color was corrupted").bg().to_string();
+    let bg_image = match Root::summon().unwrap().bg_image {
+        Some(_) => {
+            format!(r"background-image: url(../css/background_image.png);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-size: 100% 100%;")
+        },
+        None => {
+            format!("background: {};", bg)
+        }
+    };
 
     format!(
-r"body {{
+r"
+body {{
     font-size: 16px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'DM Sans', 'Nunito Sans', sans-serif;
+    color: {text};
+    {bg_image}
 }}
 
 h1, h2, h3, h4, h5 {{
-    color: #000
+    color: {text};
 }}
 
 a {{
@@ -33,7 +49,6 @@ a:visited {{
 a:hover {{
     background: {c};
     color: {bw};
-    font-weight: normal;
 }}
 
 #content {{
@@ -45,7 +60,7 @@ a:hover {{
 }}
 
 #footer {{
-    border-top: solid black 2px;
+    border-top: solid {text} 2px;
     padding-top: 1em;
     padding-bottom: 1em;
     padding-left: 15em;
@@ -59,7 +74,7 @@ a:hover {{
 }}
 
 .collapsible {{
-    background-color: #fff;
+    background-color: {bg};
     color: white;
     cursor: pointer;
     width: 100%;
@@ -68,7 +83,7 @@ a:hover {{
     border: none;
     text-align: left;
     outline: none;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'DM Sans', 'Nunito Sans', sans-serif;
 }}
   
 .collapsible:hover {{
@@ -101,7 +116,7 @@ a:hover {{
     position: absolute;
     z-index: 1;
 }}
-", c=c, bw=bw_color.to_string(), light=light_color.to_string())
+")
 }
 
 pub fn build_css(root: &Root, file_queue: &mut FileQueue) {

@@ -13,6 +13,9 @@ pub struct AddSettings {
     /// Color of the section
     #[arg(long)]
     color: String, 
+    /// Verbosity
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 #[derive(Parser)]
@@ -93,6 +96,9 @@ impl Section {
 
 impl AddSettings {
     pub fn run(&self) -> MyResult<()> {
+        unsafe {
+            crate::VERBOSE = self.verbose;
+        }
         let color = match Color::from_str(self.color.trim_end()) {
             Ok(c) => c,
             Err(_) => return Err("Please give a proper hex-formatted color (e.g., #abcdef).".to_owned())

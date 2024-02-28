@@ -14,15 +14,19 @@ pub struct Root {
     pub wikid_version_minor: String,
     pub name: String,
     pub public_url: String,
+    pub bg_image: Option<String>,
 }
 
 #[derive(Parser)]
 pub struct InitSettings {
     /// Name of the wiki
     name: String,
-    #[arg(long)]
     /// Set to turn of git init
+    #[arg(long)]
     nogit: bool,
+    /// Verbosity
+    #[arg(long, short)]
+    verbose: bool,
 }
 
 impl Root {
@@ -31,6 +35,7 @@ impl Root {
             wikid_version_minor: env!("CARGO_PKG_VERSION_MINOR").to_owned(),
             name,
             public_url: String::new(),
+            bg_image: None
         }
     }
 
@@ -183,6 +188,9 @@ impl Root {
 
 impl InitSettings {
     pub fn run(&self) -> MyResult<()> {
+        unsafe {
+            crate::VERBOSE = self.verbose;
+        }
         if let Err(_) = fs::create_dir(".wikid") {
             return Err("Could not create .wikid directory".to_owned());
         }

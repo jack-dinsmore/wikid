@@ -45,7 +45,7 @@ impl FileQueue {
 
         for (from, to) in self.imgs {
             if let Err(_) = fs::copy(&from, &to) {
-                return Err(format!("Could not move image to {}", to));
+                return Err(format!("Could not move image at {} to {}", from, to));
             }
         }
 

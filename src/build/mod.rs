@@ -20,11 +20,17 @@ pub(crate) struct BuildSettings {
     public: bool,
     #[arg(short, long)]
     /// Open HTML after build
-    run: bool
+    run: bool,
+    /// Verbosity
+    #[arg(long, short)]
+    verbose: bool,
 }
 
 impl BuildSettings {
     pub fn run(&self) -> MyResult<()> {
+        unsafe {
+            crate::VERBOSE = self.verbose;
+        }
         let root = Root::summon()?;
         
         if self.public {
@@ -35,14 +41,26 @@ impl BuildSettings {
         }
         
         let mut file_queue = FileQueue::new();
+
+        if let Some(image) = &root.bg_image {
+            if !image.ends_with(".png") {
+                return Err(format!("The background image {} is not a PNG", image));
+            }
+            //TODO do this
+            file_queue.append_imgs(vec![(image.to_owned(), "html/css/background_image.png".to_owned())]);
+        }
         
         // Make css files
-        println!("Building css files");
+        if crate::is_verbose() {
+            println!("Building css files");
+        }
         build_css(&root, &mut file_queue);
         
         // Compile
         let compile_tree = Node::new()?;
-        println!("Compiling {} files", compile_tree.size());
+        if crate::is_verbose() {
+            println!("Compiling {} files", compile_tree.size());
+        }
         let ref_map = compile_tree.ref_map(self.public)?;
         
         compile_tree.compile(&mut file_queue, &ref_map, self.public)?;
@@ -62,11 +80,14 @@ impl BuildSettings {
                 return Err("Could not clean target directory".to_owned());
             }
         }
-        
-        println!("Writing {} files", file_queue.size());
+        if crate::is_verbose() {
+            println!("Writing {} files", file_queue.size());
+        }
         file_queue.write(&target_dir)?;
         
-        println!("Succeeded");
+        if crate::is_verbose() {
+            println!("Succeeded");
+        }
         
         if self.run {
             let path = root.get_link_from_local("html/index.html", self.public)?;

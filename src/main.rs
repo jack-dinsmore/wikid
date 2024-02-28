@@ -13,6 +13,11 @@ use build::BuildSettings;
 use root::InitSettings;
 use section::AddSettings;
 
+static mut VERBOSE: bool = false;
+fn is_verbose() -> bool {
+    unsafe {VERBOSE}
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Initializes a wiki

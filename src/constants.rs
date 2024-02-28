@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize, Serializer};
 
 pub type MyResult<T> = Result<T, String>;
 
+pub const DARK_MODE: bool = true;
 const LIGHT_SHRINK: f32 = 0.2;
 
 #[derive(Debug, Deserialize)]
@@ -23,10 +24,34 @@ impl Color {
     }
 
     pub fn light(&self) -> Color {
-        Color {
-            r: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.r) as f32 / 255.0)) as u8,
-            g: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.g) as f32 / 255.0)) as u8,
-            b: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.b) as f32 / 255.0)) as u8,
+        if DARK_MODE{
+            Color {
+                r: (LIGHT_SHRINK * self.r as f32) as u8,
+                g: (LIGHT_SHRINK * self.g as f32) as u8,
+                b: (LIGHT_SHRINK * self.b as f32) as u8,
+            }
+        } else {
+            Color {
+                r: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.r) as f32 / 255.0)) as u8,
+                g: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.g) as f32 / 255.0)) as u8,
+                b: (255.0 * (1.0 - LIGHT_SHRINK * (255 - self.b) as f32 / 255.0)) as u8,
+            }
+        }
+    }
+
+    pub(crate) fn text(&self) -> Color {
+        if DARK_MODE {
+            Color { r: 0xff,g: 0xf0,b: 0xf0}
+        } else {
+            Color { r: 0x0,g: 0x0,b: 0x0}
+        }
+    }
+
+    pub(crate) fn bg(&self) -> Color {
+        if DARK_MODE {
+            Color { r: 0x08,g: 0x08,b: 0x08}
+        } else {
+            Color { r: 0xff,g: 0xff,b: 0xff}
         }
     }
 }
