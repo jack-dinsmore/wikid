@@ -8,6 +8,8 @@ use crate::constants::*;
 use crate::section::Section;
 use git2::Repository;
 
+const DEFAULT_COLOR: &'static str = "#cccccc";
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Root {
     pub wikid_version_major: String,
@@ -15,6 +17,7 @@ pub struct Root {
     pub name: String,
     pub public_url: String,
     pub bg_image: Option<String>,
+    pub main_color: String,
 }
 
 #[derive(Parser)]
@@ -35,7 +38,8 @@ impl Root {
             wikid_version_minor: env!("CARGO_PKG_VERSION_MINOR").to_owned(),
             name,
             public_url: String::new(),
-            bg_image: None
+            bg_image: None,
+            main_color: DEFAULT_COLOR.to_owned(),
         }
     }
 

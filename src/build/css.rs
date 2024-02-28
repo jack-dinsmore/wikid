@@ -3,8 +3,6 @@ use crate::root::Root;
 use crate::constants::Color;
 use crate::build::file_queue::FileQueue;
 
-const DEFAULT_COLOR: &'static str = "#aa22ff";
-
 fn css_text(c: &str) -> String {
     let bw = Color::from_str(c).expect("Color was corrupted").bw().to_string();
     let light = Color::from_str(c).expect("Color was corrupted").light().to_string();
@@ -123,5 +121,5 @@ pub fn build_css(root: &Root, file_queue: &mut FileQueue) {
     for sec in &root.get_sections() {
         file_queue.add(format!("css/{}.css", sec.name), css_text(&sec.color));
     }
-    file_queue.add("css/text.css".to_owned(), css_text(DEFAULT_COLOR));
+    file_queue.add("css/text.css".to_owned(), css_text(&root.main_color));
 }

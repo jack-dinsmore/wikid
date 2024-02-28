@@ -29,8 +29,9 @@ The `amsmath` package is provided, and the macros `\bm`, `\parens`, `\brackets`,
 * Increment versions
 * Separate captions from images so that you can have a figure with multiple images and one caption. Add formatting to the caption.
 * Tables
-* Footnotes in the margins
-* Latex and links in footnotes
+* Footnotes in the margins instead of the bottom
+* Make footnotes link back to the text
+* Allowing Latex and links in footnotes
+* Links take the color of the page they link to instead of from
 * Plots
 * Feynman diagrams
-* Make footnotes link back to the text
