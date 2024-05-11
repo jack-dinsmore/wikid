@@ -8,7 +8,9 @@ fn css_text(c: &str) -> String {
     let light = Color::from_str(c).expect("Color was corrupted").light().to_string();
     let text = Color::from_str(c).expect("Color was corrupted").text().to_string();
     let bg = Color::from_str(c).expect("Color was corrupted").bg().to_string();
-    let bg_image = match Root::summon().unwrap().bg_image {
+    let root = Root::summon().unwrap();
+    let mut preamble = "".to_owned();
+    let bg_image = match root.bg_image {
         Some(_) => {
             format!(r"background-image: url(../css/background_image.png);
     background-repeat: no-repeat;
@@ -19,12 +21,39 @@ fn css_text(c: &str) -> String {
             format!("background: {};", bg)
         }
     };
+    let font_family = match &root.fonts {
+        Some(fonts) => {
+            let mut out = "".to_owned();
+            let mut font_index = 0;
+            for item in fonts {
+                if item.ends_with(".ttf") {
+                    font_index += 1;
+                    // This is a path. Make the font css entry
+                    let name = format!("font{font_index}");
+                    preamble = format!("{preamble}
+@font-face {{
+    font-family: \"{name}\";
+    src: url(\"{item}\");
+}}");
+                    out = format!("{} '{}', ", out, name);
+                } else {
+                    out = format!("{} '{}', ", out, item);
+                }
+            }
+            out = format!("{} 'sans-serif'", out);
+            out
+        },
+        None => {
+            "'DM Sans', 'Nunito Sans', sans-serif".to_owned()
+        }
+    };
 
     format!(
 r"
+{preamble}
 body {{
     font-size: 16px;
-    font-family: 'DM Sans', 'Nunito Sans', sans-serif;
+    font-family: {font_family};
     color: {text};
     {bg_image}
 }}

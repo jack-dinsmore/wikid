@@ -17,7 +17,9 @@ pub struct Root {
     pub name: String,
     pub public_url: String,
     pub bg_image: Option<String>,
+    pub fonts: Option<Vec<String>>,
     pub main_color: String,
+    pub dark_mode: bool,
 }
 
 #[derive(Parser)]
@@ -39,6 +41,8 @@ impl Root {
             name,
             public_url: String::new(),
             bg_image: None,
+            fonts: None,
+            dark_mode: true,
             main_color: DEFAULT_COLOR.to_owned(),
         }
     }
@@ -121,7 +125,7 @@ impl Root {
     }
 
     pub fn write(&self) -> MyResult<()> {
-        let json_text = match serde_json::to_string(self) {
+        let json_text = match serde_json::to_string_pretty(self) {
             Err(_) => return Err("Failed to write root data to json".to_owned()),
             Ok(t) => t
         };
