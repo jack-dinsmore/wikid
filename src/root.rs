@@ -20,6 +20,7 @@ pub struct Root {
     pub fonts: Option<Vec<String>>,
     pub main_color: String,
     pub dark_mode: bool,
+    pub font_size: u32,
 }
 
 #[derive(Parser)]
@@ -43,6 +44,7 @@ impl Root {
             bg_image: None,
             fonts: None,
             dark_mode: true,
+            font_size: 16,
             main_color: DEFAULT_COLOR.to_owned(),
         }
     }

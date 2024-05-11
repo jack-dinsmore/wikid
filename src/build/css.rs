@@ -47,12 +47,13 @@ fn css_text(c: &str) -> String {
             "'DM Sans', 'Nunito Sans', sans-serif".to_owned()
         }
     };
+    let font_size = root.font_size;
 
     format!(
 r"
 {preamble}
 body {{
-    font-size: 16px;
+    font-size: {font_size}px;
     font-family: {font_family};
     color: {text};
     {bg_image}
@@ -110,7 +111,7 @@ a:hover {{
     border: none;
     text-align: left;
     outline: none;
-    font-family: 'DM Sans', 'Nunito Sans', sans-serif;
+    font-family: {font_family};
 }}
   
 .collapsible:hover {{
