@@ -17,6 +17,7 @@ struct PossibleLink {
     progress: u8 // zero for no link, 1 for first part, 2 for intermediate, 3 for second part.
 }
 
+/// An enum for keeping track of the state of a link
 enum LinkReturn {
     Pushed,
     Failed(String),
@@ -85,11 +86,13 @@ impl PossibleLink {
         match c {
             '[' => {
                 if self.progress == 0 {
+                    // Begin the link
                     self.display_text = "".to_owned();
                     self.progress = 1;
                     return LinkReturn::Pushed;
                 }
                 else {
+                    // Brackets are always the first item in a link
                     return LinkReturn::Failed(self.clear(c));
                 }
             },
@@ -119,6 +122,7 @@ impl PossibleLink {
 
             ']' => {
                 if self.progress == 1 {
+                    // End the bracket
                     self.progress = 2;
                     return LinkReturn::Pushed;
                 }
@@ -129,7 +133,6 @@ impl PossibleLink {
 
             ')' => {
                 if self.progress == 3 && self.link_type == '(' {
-
                     return LinkReturn::Done;
                 }
                 else {
@@ -152,16 +155,20 @@ impl PossibleLink {
         match self.progress {
             0 => return LinkReturn::Pass,
             1 => self.display_text.push(c),
-            2 => return LinkReturn::Footnote(self.prep_for_footnote(c)),
+            2 => return self.prep_for_footnote(c),
             3 => self.link_text.push(c),
             _ => panic!("Progress should not get this high")
         };
         LinkReturn::Pushed
     }
 
-    fn prep_for_footnote(&mut self, c: char) -> String {
+    fn prep_for_footnote(&mut self, c: char) -> LinkReturn {
         let s = self.clear(c);
-        return (&s[1..(s.len()-1)]).to_owned()
+        if s.len() >= 2 {
+            LinkReturn::Footnote((&s[1..(s.len()-1)]).to_owned())
+        } else {
+            LinkReturn::Failed(s)
+        }
     }
 
     fn clear(&mut self, c: char) -> String {
@@ -251,6 +258,8 @@ impl Command {
     pub fn new() -> Command {
         Command {c_type: CommandTypes::Evaluating }
     }
+
+    /// Parse a command character. Returns true if the character has been handled, false otherwise.
     pub fn parse_command(&mut self, c: char) -> bool {
         match self.c_type {
             CommandTypes::Evaluating => (),
@@ -258,7 +267,7 @@ impl Command {
             CommandTypes::CodeProgress(_) => (),
             CommandTypes::OrderedListProgress => (),
             CommandTypes::MultiLatexProgress => (),
-            CommandTypes::Failed => return false,
+            CommandTypes::MultiLatex => (),
             _ => return false,
         };
         self.c_type = match &self.c_type {
@@ -289,6 +298,10 @@ impl Command {
             CommandTypes::MultiLatexProgress => match c {
                 '$' => CommandTypes::MultiLatex,
                 _ => CommandTypes::Failed,
+            },
+            CommandTypes::MultiLatex => match c {
+                '$' => return true,
+                _ => return false,
             },
             _ => self.c_type
             
@@ -476,9 +489,6 @@ pub fn compile_file<'a>(local_path: &'a str, file_queue: &mut FileQueue, ref_map
 <head>
     <meta charset="utf-8">
     <link rel="stylesheet" type = "text/css" href = "{css_name}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap" rel="stylesheet">
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async
             src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
