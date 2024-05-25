@@ -29,6 +29,7 @@ enum Commands {
     // Rm(RmSettings),
     // Mv(MvSettings),
     // Root(RootSettings),
+    Syntax,
 }
 
 #[derive(Parser)]
@@ -46,6 +47,10 @@ fn main() {
         Commands::Init(m) => m.run(),
         Commands::Build(m) => m.run(),
         Commands::Add(m) => m.run(),
+        Commands::Syntax => {
+            display_syntax();
+            Ok(())
+        },
         // Commands::Rm(m) => m.run(),
         // Commands::Mv(m) => m.run(),
     };
@@ -54,4 +59,43 @@ fn main() {
         Ok(_) => (),
         Err(e) => println!("{}", e),
     };
+}
+
+fn display_syntax() {
+    const HELP_STR: &'static str = "\x1b[1;32mWikid syntax\x1b[0m
+\x1b[1;36mText\x1b[0m
+-  _italics_
+-  *bold*
+
+\x1b[1;36mLinks\x1b[0m
+-  [link text](hyperlink)
+-  ![Caption]{path_to_figure}
+-  [link text]{reference}, where reference is an equation, figure, table, note, section, or subsection
+- [footnote]
+
+\x1b[1;36mLaTeX\x1b[0m
+-  ~label, before the equation
+-  Reference equations with []{equation label}
+-  Use double dollar signs in a new line to start a newline equation
+-  Amsmath is loaded, with \\bm, \\parens, \\brackets, \\braces, \\eval, \\fraci, and \\expp
+";
+
+    // Create a command to execute `less`
+    let mut less = std::process::Command::new("less")
+        .arg("-R")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn less command");
+
+    // Write the string to the stdin of the `less` command
+    if let Some(stdin) = &mut less.stdin {
+        std::io::Write::write_all(stdin, HELP_STR.as_bytes()).expect("Failed to write to less stdin");
+    }
+
+    // Wait for the `less` command to finish
+    let status = less.wait().expect("Failed to wait on less command");
+
+    if !status.success() {
+        eprintln!("less command failed with status: {}", status);
+    }
 }
