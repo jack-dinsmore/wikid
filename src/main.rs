@@ -24,6 +24,8 @@ enum Commands {
     Init(InitSettings),
     /// Compile markdown to HTML
     Build(BuildSettings),
+    /// Open the blog locally with Chrome
+    Open,
     /// Add a section
     Add(AddSettings),
     // Rm(RmSettings),
@@ -45,6 +47,13 @@ fn main() {
 
     let result = match cli.commands {
         Commands::Init(m) => m.run(),
+        Commands::Open => {
+            std::process::Command::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+                .arg("--allow-file-access-from-files")
+                .arg(&root::Root::get_path_from_local("html/index.html").unwrap())
+                .spawn().unwrap();
+            Ok(())
+        }
         Commands::Build(m) => m.run(),
         Commands::Add(m) => m.run(),
         Commands::Syntax => {

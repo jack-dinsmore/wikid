@@ -254,7 +254,7 @@ impl PossibleLink {
         res
     }
     
-    fn make_applet(&mut self, public: bool) -> MyResult<String> {
+    fn make_applet(&mut self) -> MyResult<String> {
         let root = Root::summon()?;
         let link_parts = self.link_text.split('?').collect::<Vec<&str>>();
         let (applet_path, applet_width, applet_height) = if link_parts.len() == 1 {
@@ -824,7 +824,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
                     LinkReturn::Footnote(s) => result.push_str(&parse_state.footnote(s, c)),
                     LinkReturn::Done => result.push_str(&match command.c_type {
                         CommandTypes::Image => possible_link.make_img(parse_state, public)?,
-                        CommandTypes::Applet => possible_link.make_applet( public)?,
+                        CommandTypes::Applet => possible_link.make_applet()?,
                         _ => possible_link.make(ref_map, local_path)?
                     }),
                     LinkReturn::Pass =>  match modifiers.check(c)? {
