@@ -419,6 +419,13 @@ impl {applet_camel_name} {{
         // Move to bin
         let bin_dir = Root::get_path_from_local(&format!("bin")).unwrap();
         let _ = std::fs::create_dir(&bin_dir);
+        
+        let bin_path = format!("{}/{}_bg.wasm", bin_dir, applet_name);
+        let pkg_path = format!("{}/pkg/{}_bg.wasm", rust_path.to_str().unwrap(), applet_name);
+        if let Err(_) = std::fs::rename(&pkg_path, &bin_path) {
+            return Err("Could not move the compiled file to the binary directory".to_owned());
+        }
+
         let bin_path = format!("{}/{}.js", bin_dir, applet_name);
         let pkg_path = format!("{}/pkg/{}.js", rust_path.to_str().unwrap(), applet_name);
         if let Err(_) = std::fs::rename(&pkg_path, &bin_path) {
@@ -437,7 +444,7 @@ impl {applet_camel_name} {{
     import init, {{{applet_camel_name}}} from \"{bin_path}\";
     await init();
 
-    const {applet_name} = LinearFitDemo.new(\"{applet_name}\");
+    const {applet_name} = {applet_camel_name}.new(\"{applet_name}\");
     let last = Date.now();
 
     const renderLoop = () => {{
@@ -450,13 +457,13 @@ impl {applet_camel_name} {{
         }}
     }};
     document.getElementById(\"{applet_name}\").addEventListener(\"mousedown\", function(event) {{
-        universe.mouse_button_down(event.offsetX, event.offsetY)
+        {applet_name}.mouse_button_down(event.offsetX, event.offsetY)
     }});
     document.getElementById(\"{applet_name}\").addEventListener(\"mouseup\", function(event) {{
-        universe.mouse_button_up(event.offsetX, event.offsetY)
+        {applet_name}.mouse_button_up(event.offsetX, event.offsetY)
     }});
     document.getElementById(\"{applet_name}\").addEventListener(\"mousemove\", function(event) {{
-        universe.mouse_move(event.offsetX, event.offsetY)
+        {applet_name}.mouse_move(event.offsetX, event.offsetY)
     }});
     requestAnimationFrame(renderLoop);
 
