@@ -438,7 +438,7 @@ impl {applet_camel_name} {{
         self.link_type = '.';
         let caption = self.display_text.clone();
         
-        let res = Ok(format!("<canvas id=\"{applet_name}\"></canvas>
+        let res = Ok(format!("<center><canvas id=\"{applet_name}\"></canvas>
         <div class=\"caption\"><b>Applet:</b> {caption}</div></center>
 <script type=\"module\">
     import init, {{{applet_camel_name}}} from \"{bin_path}\";
