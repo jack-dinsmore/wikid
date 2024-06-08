@@ -81,8 +81,8 @@ fn display_syntax() {
 -  ![Caption]{path_to_figure}
 -  ?[Caption]{path_to_applet}
 -  [link text]{reference}, where reference is an equation, figure, table, note, section, or subsection
-- [footnote]
-- For all links, {} represent a local path and [] represent a global path
+-  [footnote]
+-  For all links, {} represent a local path and [] represent a global path
 
 \x1b[1;36mLaTeX\x1b[0m
 -  ~label, before the equation

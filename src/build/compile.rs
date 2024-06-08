@@ -10,6 +10,7 @@ use chrono::{Datelike, Month};
 use num_traits::FromPrimitive;
 
 /// A struct for parsing links
+#[derive(Debug)]
 struct PossibleLink {
     display_text: String,
     link_text: String,
@@ -18,11 +19,18 @@ struct PossibleLink {
 }
 
 /// An enum for keeping track of the state of a link
+#[derive(Clone)]
 enum LinkReturn {
+    /// The character was successfully added
     Pushed,
+    Child,
+    /// This character makes the link invalid
     Failed(String),
+    /// The link was successfully concluded and created a footnote
     Footnote(String),
+    /// The link was successfully concluded
     Done,
+    /// This was not a link
     Pass
 }
 
@@ -94,7 +102,7 @@ impl PossibleLink {
                 }
                 else {
                     // Brackets are always the first item in a link
-                    return LinkReturn::Failed(self.clear(c));
+                    return LinkReturn::Child;
                 }
             },
 
@@ -104,9 +112,6 @@ impl PossibleLink {
                     self.progress = 3;
                     return LinkReturn::Pushed;
                 }
-                else {
-                    return LinkReturn::Failed(self.clear(c));
-                }
             },
 
             '{' => {
@@ -114,9 +119,6 @@ impl PossibleLink {
                     self.link_type = c;
                     self.progress = 3;
                     return LinkReturn::Pushed;
-                }
-                else {
-                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -127,17 +129,11 @@ impl PossibleLink {
                     self.progress = 2;
                     return LinkReturn::Pushed;
                 }
-                else {
-                    return LinkReturn::Failed(self.clear(c));
-                }
             },
 
             ')' => {
                 if self.progress == 3 && self.link_type == '(' {
                     return LinkReturn::Done;
-                }
-                else {
-                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -145,9 +141,6 @@ impl PossibleLink {
                 if self.progress == 3 && self.link_type == '{' {
                     self.progress = 2;
                     return LinkReturn::Done;
-                }
-                else {
-                    return LinkReturn::Failed(self.clear(c));
                 }
             },
 
@@ -172,6 +165,7 @@ impl PossibleLink {
         }
     }
 
+    /// Reset the link and return the current string
     fn clear(&mut self, c: char) -> String {
         let mut out = match self.display_text.is_empty() {
             true => String::new(),
@@ -588,7 +582,7 @@ impl Modifiers {
                         '`' => "</code>".to_owned(),
                         '$' => "\\)".to_owned(),
                         ']' => "</div>".to_owned(),
-                        _ => panic!("Unknown modifier")
+                        _ => return Err(format!("Unknown modifier {}",c))
                     }));
                 }
                 else {
@@ -602,7 +596,7 @@ impl Modifiers {
                 '`' => "<code>".to_owned(),
                 '$' => "\\(".to_owned(),
                 '[' => "<div>".to_owned(),
-                _ => panic!("Unknown modifier")
+                _ => return Err(format!("Unknown modifier {}",c))
             }));
         }
         Ok(None)
@@ -781,7 +775,7 @@ for (i = 0; i < coll.length; i++) {{
 
 fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut ParseState, public: bool, local_path: Option<&str>) -> MyResult<String> {
     let mut escaped = false;
-    let mut possible_link = PossibleLink::new();
+    let mut possible_link_stack = vec![PossibleLink::new()];// Stack, where the back is the top
     let mut result = "".to_owned();
     let mut before = "".to_owned();
     let mut command = Command::new();
@@ -818,19 +812,65 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
         else {
             match c {
                 '\\' => escaped = true,
-                _ => match possible_link.try_add(c) { // Try a link
-                    LinkReturn::Pushed => (),
-                    LinkReturn::Failed(s) => result.push_str(&s),
-                    LinkReturn::Footnote(s) => result.push_str(&parse_state.footnote(s, c)),
-                    LinkReturn::Done => result.push_str(&match command.c_type {
-                        CommandTypes::Image => possible_link.make_img(parse_state, public)?,
-                        CommandTypes::Applet => possible_link.make_applet()?,
-                        _ => possible_link.make(ref_map, local_path)?
-                    }),
-                    LinkReturn::Pass =>  match modifiers.check(c)? {
-                        Some(s) => result.push_str(&s),
-                        None => result.push(c)
-                    }// Check if it's a bold modifier
+                _ => {
+                    let possible_link_stack_ptr = possible_link_stack.as_mut_ptr();
+                    let link_len = possible_link_stack.len();
+                    let parent_link = match possible_link_stack.len() {
+                        1 => None,
+                        _ => Some(&mut possible_link_stack[link_len-2]),
+                    };
+                    let possible_link = unsafe {
+                        &mut *possible_link_stack_ptr.add(link_len-1)
+                    };
+                    let add_output = possible_link.try_add(c);
+                    match add_output.clone() { // Try a link
+                        LinkReturn::Pushed => (),
+                        LinkReturn::Child => {
+                            let mut new_link = PossibleLink::new();
+                            new_link.try_add(c);
+                            possible_link_stack.push(new_link);
+                        },
+                        LinkReturn::Failed(s) => result.push_str(&s),
+                        LinkReturn::Footnote(s) => result.push_str(&parse_state.footnote(s, c)),
+                        LinkReturn::Done => {
+                            match parent_link {
+                                None => {
+                                    // This is concluding the outermost link
+                                    let output_str = match command.c_type {
+                                        CommandTypes::Image => possible_link.make_img(parse_state, public)?,
+                                        CommandTypes::Applet => possible_link.make_applet()?,
+                                        _ => possible_link.make(ref_map, local_path)?
+                                    };
+                                    result.push_str(&output_str);
+                                },
+                                Some(parent_link) => {
+                                    // This is concluding an inner link, which cannot be an image or applet. Add the text to the display text of the inner link
+                                    let output_str = possible_link.make(ref_map, local_path)?;
+                                    parent_link.display_text.push_str(&output_str);
+                                }
+                            };
+                        },
+                        LinkReturn::Pass =>  match modifiers.check(c)? {
+                            Some(s) => result.push_str(&s),
+                            None => result.push(c)
+                        }// Check if it's a bold modifier
+                    }
+                    match &add_output {
+                        LinkReturn::Pass |
+                        LinkReturn::Pushed |
+                        LinkReturn::Child => (), // Keep the links
+                        LinkReturn::Done |
+                        LinkReturn::Footnote(_) => {
+                            if possible_link_stack.len() > 1 {
+                                possible_link_stack.pop();
+                            }
+                        }, // Destroy the link
+                        LinkReturn::Failed(_) => {
+                            if possible_link_stack.len() > 1 {possible_link_stack.pop();}
+                            // possible_link_stack.clear();
+                            // possible_link_stack.push(PossibleLink::new());
+                        }// A failure destroys the whole link chain.
+                    };
                 }
             };
         }
