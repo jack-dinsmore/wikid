@@ -9,6 +9,7 @@ mod refs;
 mod file_queue;
 mod compile_tree;
 mod compile;
+mod links;
 
 use clap::Parser;
 use css::build_css;
