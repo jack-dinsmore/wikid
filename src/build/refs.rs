@@ -79,6 +79,9 @@ impl RefMap {
                     header_index = *i;
                     sec_num[*i as usize] += 1;
                 },
+                CommandTypes::MultiLatex => eq_num += 1,
+                CommandTypes::Image => fig_num += 1,
+
                 _ => ()
             };
 
@@ -92,15 +95,17 @@ impl RefMap {
                             self.public)?
                     ));},
                     CommandTypes::MultiLatex => {self.eqs.insert(label.to_owned(), (
-                        eq_num,
+                        eq_num-1,
                         root.get_link_from_local(
-                            &format!("{}.html#eq{}", bare_link, eq_num), self.public)?
-                    )); eq_num += 1;},
-                    CommandTypes::Image => {self.figures.insert(label.to_owned(), (
-                        fig_num,
-                        root.get_link_from_local(
-                            &format!("{}.html#fig{}", bare_link, fig_num), self.public)?
-                    )); fig_num += 1;},
+                            &format!("{}.html#eq{}", bare_link, eq_num-1), self.public)?
+                    ));},
+                    CommandTypes::Image => {self.figures.insert(label.to_owned(),
+                        (
+                            fig_num-1,
+                            root.get_link_from_local(
+                                &format!("{}.html#fig{}", bare_link, fig_num-1), self.public)?
+                        )
+                    );},
                     _ => {
                         println!("Unused label {} with command type {:?}", label, command.c_type);
                     }

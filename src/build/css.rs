@@ -62,6 +62,7 @@ body {{
 
 h1, h2, h3, h4, h5 {{
     color: {text};
+    line-height: 1.45;
 }}
 
 a {{

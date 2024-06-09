@@ -168,6 +168,14 @@ impl PossibleLink {
         }
     }
 
+    pub fn end_of_line_check(&mut self) -> LinkReturn {
+        match self.progress {
+            0 => LinkReturn::Pass,
+            2 => self.prep_for_footnote(' '),
+            _ => LinkReturn::Failed(self.clear(' '))
+        }
+    }
+
     /// Reset the link and return the current string
     fn clear(&mut self, c: char) -> String {
         let mut out = match self.display_text.is_empty() {

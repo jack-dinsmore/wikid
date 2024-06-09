@@ -319,6 +319,39 @@ for (i = 0; i < coll.length; i++) {{
     Ok(compiled_text)
 }
 
+struct QuoteTracker {
+    letter_before: bool,
+}
+impl QuoteTracker {
+    fn new() -> Self {
+        Self {
+            letter_before: false,
+        }
+    }
+    fn handle_quote(&mut self, c: char) -> char {
+        if c == '\'' {
+            if self.letter_before {
+                '’'
+            } else {
+                '‘'
+            }
+        } else if c == '"' {
+            if self.letter_before {
+                '”'
+            } else {
+                '“'
+            }
+        } else {
+            if c == ' ' || c == '\n' {
+                self.letter_before = false;
+            } else {
+                self.letter_before = true;
+            }
+            c
+        }
+    }
+}
+
 fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut ParseState, public: bool, local_path: Option<&str>) -> MyResult<String> {
     let mut escaped = false;
     let mut possible_link_stack = vec![PossibleLink::new()];// Stack, where the back is the top
@@ -326,7 +359,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
     let mut before = "".to_owned();
     let mut command = Command::new();
     let mut modifiers = Modifiers::new();
-
+    let mut quote_tracker = QuoteTracker::new();
 
     if uncompiled_line.is_empty(){
         if parse_state.previous_paragraph {
@@ -336,6 +369,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
     }
 
     for c in uncompiled_line.chars() {
+        let c = quote_tracker.handle_quote(c);
         if command.parse_command(c) {
             continue;
         }
@@ -470,6 +504,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
             result = format!("<p>{}", result);
             parse_state.previous_paragraph = true;
         }
+        possible_link_stack.last_mut().unwrap().end_of_line_check();
     }
     if let CommandTypes::Failed = command.c_type {
         if !parse_state.previous_paragraph {
