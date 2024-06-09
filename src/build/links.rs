@@ -469,4 +469,12 @@ impl {applet_camel_name} {{
         self.display_text = "".to_owned();
         res
     }
+    
+    pub fn modifiers_is_latex(&self) -> bool {
+        self.modifiers.is_latex()
+    }
+    
+    pub fn unchecked_add(&mut self, c: char) {
+        self.display_text.push(c)
+    }
 }

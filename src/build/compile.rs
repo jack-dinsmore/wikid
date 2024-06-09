@@ -348,6 +348,9 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
         else if c != '$' && modifiers.is_latex() {
             result.push(c);
         }
+        else if c != '$' && possible_link_stack.last_mut().unwrap().modifiers_is_latex() {
+            possible_link_stack.last_mut().unwrap().unchecked_add(c);
+        }
         else if let CommandTypes::MultiLatex = command.c_type {
             result.push(c);
         }
