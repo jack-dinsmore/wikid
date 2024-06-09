@@ -485,5 +485,11 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
         parse_state.eq_num += 1;
     }
 
+    if let CommandTypes::Header(i) = command.c_type {
+        if i == 1 {
+            parse_state.section_open = false;
+        }
+    }
+
     Ok(output)
 }
