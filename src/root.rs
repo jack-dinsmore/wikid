@@ -77,12 +77,14 @@ impl Root {
         for i in 32..47u8 {
             if i == b'%' {continue;}
             if i == b'#' {continue;}
+            if i == b'.' {continue;}
             no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
         }
         for i in 58..65u8 {
             no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
         }
         for i in 91..97u8 {
+            if i == b'_' {continue;}
             no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
         }
         for i in 123..127u8 {

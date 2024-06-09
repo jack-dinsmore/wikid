@@ -387,7 +387,7 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
                                     // This is concluding the outermost link
                                     let output_str = match command.c_type {
                                         CommandTypes::Image => possible_link.make_img(parse_state, public)?,
-                                        CommandTypes::Applet => possible_link.make_applet()?,
+                                        CommandTypes::Applet => possible_link.make_applet(public)?,
                                         _ => possible_link.make(ref_map, local_path)?
                                     };
                                     result.push_str(&output_str);

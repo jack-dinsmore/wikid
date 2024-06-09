@@ -55,7 +55,7 @@ impl BuildSettings {
         if crate::is_verbose() {
             println!("Building css files");
         }
-        build_css(&root, &mut file_queue);
+        build_css(&root, &mut file_queue, self.public);
         
         // Compile
         let compile_tree = Node::new()?;

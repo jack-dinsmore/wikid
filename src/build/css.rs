@@ -3,7 +3,7 @@ use crate::root::Root;
 use crate::constants::Color;
 use crate::build::file_queue::FileQueue;
 
-fn css_text(c: &str) -> String {
+fn css_text(c: &str, public: bool) -> String {
     let bw = Color::from_str(c).expect("Color was corrupted").bw().to_string();
     let light = Color::from_str(c).expect("Color was corrupted").light().to_string();
     let text = Color::from_str(c).expect("Color was corrupted").text().to_string();
@@ -30,10 +30,11 @@ fn css_text(c: &str) -> String {
                     font_index += 1;
                     // This is a path. Make the font css entry
                     let name = format!("font{font_index}");
+                    let item_link = root.get_link_from_local(item, public).unwrap();
                     preamble = format!("{preamble}
 @font-face {{
     font-family: \"{name}\";
-    src: url(\"{item}\");
+    src: url(\"{item_link}\");
 }}");
                     out = format!("{} '{}', ", out, name);
                 } else {
@@ -128,7 +129,7 @@ a:hover {{
 .caption {{
     font-size: 14px;
     padding-top: 1em;
-    padding:bottom: 1em;
+    padding-bottom: 1em;
 }}
 
 .tooltip .tooltiptext {{
@@ -162,9 +163,9 @@ a:hover {{
 ")
 }
 
-pub fn build_css(root: &Root, file_queue: &mut FileQueue) {
+pub fn build_css(root: &Root, file_queue: &mut FileQueue, public: bool) {
     for sec in &root.get_sections() {
-        file_queue.add(format!("css/{}.css", sec.name), css_text(&sec.color));
+        file_queue.add(format!("css/{}.css", sec.name), css_text(&sec.color, public));
     }
-    file_queue.add("css/text.css".to_owned(), css_text(&root.main_color));
+    file_queue.add("css/text.css".to_owned(), css_text(&root.main_color, public));
 }

@@ -251,7 +251,7 @@ impl PossibleLink {
         res
     }
     
-    pub fn make_applet(&mut self) -> MyResult<String> {
+    pub fn make_applet(&mut self, public: bool) -> MyResult<String> {
         let root = Root::summon()?;
         let link_parts = self.link_text.split('?').collect::<Vec<&str>>();
         let (applet_path, applet_width, applet_height) = if link_parts.len() == 1 {
@@ -428,11 +428,13 @@ impl {applet_camel_name} {{
         if let Err(_) = std::fs::rename(&pkg_path, &bin_path) {
             return Err("Could not move the compiled file to the binary directory".to_owned());
         }
+
         
         // Reset the link
         self.progress = 0;
         self.link_text = "".to_owned();
         self.link_type = '.';
+        let bin_path = root.get_link_from_local(&format!("bin/{}.js", applet_name), public)?;
         let caption = self.display_text.clone();
         
         let res = Ok(format!("<center><canvas id=\"{applet_name}\"></canvas>
