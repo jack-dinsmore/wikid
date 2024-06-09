@@ -76,6 +76,7 @@ impl Root {
         no_space_local = no_space_local.replace(b'%' as char, &format!("%{:02x}", b'%'));
         for i in 32..47u8 {
             if i == b'%' {continue;}
+            if i == b'#' {continue;}
             no_space_local = no_space_local.replace(i as char, &format!("%{:02x}", i));
         }
         for i in 58..65u8 {

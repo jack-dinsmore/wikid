@@ -52,6 +52,7 @@ pub struct ParseState {
     imgs: Vec<(String, String)>,
     fig_num: u32,
     footnotes: Vec<String>,
+    pub eq_num: usize,
 }
 impl Command {
     pub fn new() -> Command {
@@ -126,7 +127,7 @@ impl Command {
             CommandTypes::BlockQuote => "<blockquote>".to_owned(),
             CommandTypes::Code => "<code>".to_owned(),
             CommandTypes::List(_) => "<li>".to_owned(),
-            CommandTypes::MultiLatex => "\\[".to_owned(),
+            CommandTypes::MultiLatex => "<div class=\"eq\"><div class=\"eqtext\">\\[".to_owned(),
             _ => "".to_owned(),
         }
     }
@@ -145,7 +146,7 @@ impl Command {
             CommandTypes::Code => "</code>".to_owned(),
             CommandTypes::List(_) => "</li>".to_owned(),
             CommandTypes::Image => "".to_owned(),
-            CommandTypes::MultiLatex => "\\]".to_owned(),
+            CommandTypes::MultiLatex => "\\]</div>".to_owned(),
             _ => "".to_owned(),
         }
     }
@@ -166,6 +167,7 @@ impl ParseState {
             imgs: Vec::new(),
             fig_num: 0,
             footnotes: Vec::new(),
+            eq_num: 1,
         }
     }
     fn terminal(self, file_queue: &mut FileQueue) -> String{
@@ -472,6 +474,13 @@ fn parse_line(uncompiled_line: String, ref_map: &RefMap, parse_state: &mut Parse
             parse_state.previous_paragraph = true;
         }
     }
-    
-    Ok(format!("{}{}{}{}", before, command.prefix(), result, command.postfix()))
+
+    let mut output = format!("{}{}{}{}", before, command.prefix(), result, command.postfix());
+
+    if let CommandTypes::MultiLatex = command.c_type {
+        output.push_str(&format!("<div class=\"eqnum\" id=\"eq{n}\">({n})</div></div>", n=parse_state.eq_num));
+        parse_state.eq_num += 1;
+    }
+
+    Ok(output)
 }

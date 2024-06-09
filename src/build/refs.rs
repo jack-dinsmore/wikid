@@ -79,7 +79,6 @@ impl RefMap {
                     header_index = *i;
                     sec_num[*i as usize] += 1;
                 },
-                CommandTypes::MultiLatex => eq_num += 1,
                 _ => ()
             };
 

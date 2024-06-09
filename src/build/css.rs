@@ -144,6 +144,21 @@ a:hover {{
     position: absolute;
     z-index: 1;
 }}
+
+.eq {{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}}
+.eqtext {{
+    width: 95%;
+}}
+
+.eqnum {{
+    width: 5%;
+    text-align: right;
+}}
+
 ")
 }
 
